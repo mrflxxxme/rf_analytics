@@ -1,0 +1,35 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+id_*
+
+# data — never in the repo
+raw/
+marts/
+data/
+*.parquet
+*.duckdb
+*.duckdb.wal
+*.zip
+*.xml.gz
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# os / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
