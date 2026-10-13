@@ -10,7 +10,7 @@
                 │ /opt/rf-analytics/marts/<snapshot>/*.parquet ◀── rsync ──┐    │
                 │      │                                                   │    │
                 │  api (FastAPI + DuckDB read-only, ≤512 МБ)               │    │
-                │  web (статика) ── rf-analytics-caddy ── сеть edge ──▶ edge-caddy ──▶ radar.uklonskiyk.ru
+                │  web (статика) ── rf-analytics-caddy ── сеть edge ──▶ edge-caddy ──▶ <домен RADAR, D28>
                 └──────────────────────────────────────────────────────────┼────┘
                                                                            │
  открытые источники без геоблока ──▶ GitHub Actions (monthly-etl.yml) ─────┘
@@ -69,12 +69,12 @@ Query-spec — единственный способ получить данны
 - лимиты: api `mem_limit: 512m`, `cpus: 1.0` (на сервере 2 ядра и ~3 ГБ свободно,
   он общий ещё с 9 сайтами);
 - в `/opt/edge-caddy/Caddyfile` дописывается один блок
-  `radar.uklonskiyk.ru { reverse_proxy rf-analytics-caddy:8080 }`. Перед правкой —
+  `<домен> { reverse_proxy rf-analytics-caddy:8080 }` (домен - из T1.0, D28). Перед правкой —
   бэкап рядом, затем **только** `caddy validate` + `caddy reload`, никогда restart;
 - статика публикуется через `rsync -a --delete` **внутрь** существующего каталога
   (подмена каталога через `mv` ломает bind-монт).
 
-DNS: A и AAAA для поддомена в reg.ru → `194.87.187.207` / `2a03:6f00:a::2:da7f`.
+DNS: A и AAAA для домена продукта → `194.87.187.207` / `2a03:6f00:a::2:da7f`.
 
 ## Секреты
 
@@ -82,7 +82,7 @@ DNS: A и AAAA для поддомена в reg.ru → `194.87.187.207` / `2a03:
 |---|---|---|
 | `RF_DEPLOY_SSH_KEY` | GitHub Secrets | Отдельный ключ деплоя (`id_ed25519_rf_analytics`), rsync raw/marts/static |
 | `RF_DEPLOY_KNOWN_HOSTS` | GitHub Secrets | Отпечаток сервера, без `StrictHostKeyChecking=no` |
-| `CLOUDRU_API_KEY`, `DEEPSEEK_API_KEY` | GitHub Secrets + `/opt/rf-analytics/.env` | LLM (ключи переносит автор, агенты их не читают) |
+| `CLOUDRU_API_KEY`, `DEEPSEEK_API_KEY` | GitHub Secrets + `/opt/rf-analytics/.env` | LLM (ключи переносит автор, агенты их не читают). На время разработки - виртуальный ключ RADAR в LLM-шлюзе экосистемы (D33) |
 | `WORDSTAT_*` | там же | После получения доступа к API |
 | `GH_DISPATCH_TOKEN` | `/opt/rf-analytics/.env` | Fine-grained токен только на `actions:write` этого репо — для `/enrich` |
 
