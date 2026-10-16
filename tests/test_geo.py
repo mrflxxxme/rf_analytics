@@ -1,5 +1,6 @@
 import csv
 import importlib.util
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +30,22 @@ def test_known_codes():
     assert by_id["86"]["oktmo"] == "718"
     assert by_id["89"]["oktmo"] == "719"
     assert by_id["91"]["iso3166_2"] == "UA-43"
+
+
+def test_names_clean():
+    for r in regions():
+        assert "\xa0" not in r["name"] and "  " not in r["name"], r["name"]
+
+
+def test_geojson_matches_regions():
+    path = ROOT / "config" / "geo" / "regions.geojson"
+    assert path.stat().st_size <= 2_000_000
+    with open(path, encoding="utf-8") as f:
+        feats = json.load(f)["features"]
+    by_id = {r["region_id"]: r["name"] for r in regions()}
+    assert len(feats) == 89
+    assert {f["properties"]["region_id"]: f["properties"]["name"] for f in feats} == by_id
+    assert all(set(f["properties"]) == {"region_id", "name"} for f in feats)
 
 
 def _feat(iso, osm_id, coords, **tags):

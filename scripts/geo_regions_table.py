@@ -50,6 +50,7 @@ def main() -> int:
             okato = "11100"
         assert region_id not in seen, region_id
         seen.add(region_id)
+        name = " ".join(name.replace("\xa0", " ").split())  # в вики-разметке nbsp и двойные пробелы
         out.writerow([region_id, name, i, okato, oktmo, iso,
                       gost.split(",")[-1].strip(), " ".join(gibdd_codes)])
     assert len(seen) == N_SUBJECTS, len(seen)
