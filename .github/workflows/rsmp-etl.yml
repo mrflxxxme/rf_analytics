@@ -21,6 +21,11 @@ on:
 permissions:
   contents: read
 
+# opened + labeled на один коммит дают два запуска — тяжёлая матрица идёт один раз.
+concurrency:
+  group: rsmp-etl-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   UV_PROJECT: etl
 
@@ -58,7 +63,7 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 3
       matrix:
         snap: ${{ fromJson(needs.plan.outputs.matrix) }}
     steps:
