@@ -177,18 +177,14 @@ needs:
     osm_tags: [shop=car_parts]
     search_keys: [автозапчасти, магазин запчастей]
     franchise_examples: []
+  # 45.20 целиком: 3/4 субъектов указывают группу без подкласса (85,5 тыс. из 115,7 тыс.),
+  # поэтому автомойки отдельно не измеримы.
   - id: car_service
-    name: Автосервис и шиномонтаж
-    okved: ["45.20.1", "45.20.2"]
-    osm_tags: [shop=car_repair, shop=tyres]
-    search_keys: [автосервис, шиномонтаж]
+    name: Автосервис, шиномонтаж, автомойки
+    okved: ["45.20"]
+    osm_tags: [shop=car_repair, shop=tyres, amenity=car_wash]
+    search_keys: [автосервис, шиномонтаж, автомойка, детейлинг]
     franchise_examples: [Fit Service]
-  - id: car_wash
-    name: Автомойки и детейлинг
-    okved: ["45.20.3"]
-    osm_tags: [amenity=car_wash]
-    search_keys: [автомойка, детейлинг]
-    franchise_examples: []
   - id: taxi
     name: Такси
     okved: ["49.32"]
@@ -203,18 +199,14 @@ needs:
     franchise_examples: [ПВЗ Ozon, ПВЗ Wildberries, СДЭК]
 
   # --- Красота, здоровье, спорт
-  - id: hair_barbershops
-    name: Парикмахерские и барбершопы
-    okved: ["96.02.1"]
-    osm_tags: [shop=hairdresser]
-    search_keys: [барбершоп, парикмахерская]
-    franchise_examples: [OldBoy, TOPGUN, Чио Чио]
-  - id: nails_cosmetology
-    name: Маникюр и косметические услуги
-    okved: ["96.02.2"]
-    osm_tags: [shop=beauty]
-    search_keys: [маникюр, косметолог, наращивание ресниц]
-    franchise_examples: [Пальчики]
+  # 96.02 целиком: 84% субъектов указывают группу без подкласса (103,6 тыс. из 123,8 тыс.),
+  # парикмахерские и маникюр по реестру не разделить.
+  - id: beauty_salons
+    name: Парикмахерские, барбершопы, маникюр, косметология
+    okved: ["96.02"]
+    osm_tags: [shop=hairdresser, shop=beauty]
+    search_keys: [барбершоп, парикмахерская, маникюр, косметолог, наращивание ресниц]
+    franchise_examples: [OldBoy, TOPGUN, Чио Чио, Пальчики]
   - id: wellness_spa_saunas
     name: Бани, сауны, СПА, массаж, солярии
     okved: ["96.04"]
@@ -265,24 +257,15 @@ needs:
     osm_tags: [amenity=kindergarten, amenity=childcare]
     search_keys: [частный детский сад, присмотр за детьми]
     franchise_examples: []
-  - id: kids_sports
-    name: Спортивные секции и школы
-    okved: ["85.41.1"]
-    osm_tags: [leisure=sports_centre]
-    search_keys: [спортивная секция для детей, футбол для детей]
-    franchise_examples: [Чемпионика]
-  - id: creative_education
-    name: Творческие школы (музыка, танцы, рисование)
-    okved: ["85.41.2"]
-    osm_tags: [amenity=music_school, leisure=dance, amenity=dancing_school]
-    search_keys: [школа рисования, танцы для детей, уроки вокала]
-    franchise_examples: [Арт-Квартал]
+  # 85.41 целиком: больше половины субъектов указывают группу без подкласса (43,6 тыс. из 80,1 тыс.).
   - id: additional_education
-    name: Развивающие центры, языки, программирование
-    okved: ["85.41.9"]
-    osm_tags: [amenity=language_school, amenity=prep_school]
-    search_keys: [английский для детей, программирование для детей, развивающий центр]
-    franchise_examples: [Алгоритмика, KIBERone, Пифагорка]
+    name: "Дополнительное образование: секции, творческие школы, языки, программирование"
+    okved: ["85.41"]
+    osm_tags: [leisure=sports_centre, amenity=music_school, amenity=dancing_school,
+               amenity=language_school, amenity=prep_school]
+    search_keys: [спортивная секция для детей, школа рисования, танцы для детей,
+                  английский для детей, программирование для детей, развивающий центр]
+    franchise_examples: [Чемпионика, Арт-Квартал, Алгоритмика, KIBERone, Пифагорка]
   - id: driving_schools
     name: Автошколы
     okved: ["85.42.1"]
@@ -335,9 +318,10 @@ needs:
     osm_tags: [tourism=hotel, tourism=hostel, tourism=guest_house]
     search_keys: [гостиница, хостел, мини отель]
     franchise_examples: [Like Hostel]
+  # 55.30 одна — 1,2 тыс. субъектов, ниже порога; глэмпинги часто регистрируют на 55.90.
   - id: glamping_campsites
-    name: Глэмпинги и кемпинги
-    okved: ["55.30"]
+    name: Глэмпинги, кемпинги и прочее размещение
+    okved: ["55.30", "55.90"]
     osm_tags: [tourism=camp_site]
     search_keys: [глэмпинг, кемпинг]
     franchise_examples: []

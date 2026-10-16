@@ -19,10 +19,10 @@ def test_loads_and_has_about_50_needs(tax):
 
 def test_mapping_by_longest_prefix(tax):
     assert tx.need_for_okved(tax, "56.10.1") == "restaurants_cafes"
-    assert tx.need_for_okved(tax, "96.02.1") == "hair_barbershops"
-    assert tx.need_for_okved(tax, "96.02.2") == "nails_cosmetology"
-    assert tx.need_for_okved(tax, "45.20.3") == "car_wash"
-    assert tx.need_for_okved(tax, "45.20") is None  # группа шире, чем коды потребности
+    assert tx.need_for_okved(tax, "96.02") == "beauty_salons"  # группа без подкласса
+    assert tx.need_for_okved(tax, "96.02.1") == "beauty_salons"
+    assert tx.need_for_okved(tax, "45.20.3") == "car_service"
+    assert tx.need_for_okved(tax, "85.42") is None  # группа шире, чем коды потребности (85.42.1)
     assert tx.need_for_okved(tax, "56.101") is None  # префикс только по границе кода
     assert tx.need_for_okved(tax, None) is None
 
