@@ -26,6 +26,7 @@ SCHEMA = pa.schema([
     ("is_new", pa.bool_()),      # ПризНовМСП = 1
     ("region_id", pa.string()),  # КодРегион (код субъекта ФНС, D35)
     ("okved", pa.string()),      # основной ОКВЭД (заявительный)
+    ("okved_ver", pa.string()),  # ВерсОКВЭД: 2014 — ОКВЭД2, 2001 — старый (снимки до 2017)
 ])
 BATCH = 200_000
 
@@ -52,7 +53,7 @@ def _int(s: str | None) -> int | None:
     return int(s) if s and s.isdigit() else None
 
 
-def iter_documents(xml: IO[bytes], stats: Stats) -> Iterator[dict]:
+def iter_documents(xml: IO[bytes], stats: Stats, snapshot_date: dt.date | None = None) -> Iterator[dict]:
     for event, el in etree.iterparse(xml, events=("start", "end"), tag=("Файл", "Документ")):
         if el.tag == "Файл":
             if event == "start":
@@ -60,14 +61,14 @@ def iter_documents(xml: IO[bytes], stats: Stats) -> Iterator[dict]:
             continue
         if event != "end":
             continue
-        yield _row(el, stats)
+        yield _row(el, stats, snapshot_date)
         el.clear(keep_tail=False)
         parent = el.getparent()
         while el.getprevious() is not None:
             del parent[0]
 
 
-def _row(el: etree._Element, stats: Stats) -> dict:
+def _row(el: etree._Element, stats: Stats, snapshot_date: dt.date | None) -> dict:
     org = el.find("ОргВклМСП")
     ip = el.find("ИПВклМСП")
     inn = org.get("ИННЮЛ") if org is not None else (ip.get("ИННФЛ") if ip is not None else None)
@@ -78,15 +79,17 @@ def _row(el: etree._Element, stats: Stats) -> dict:
     okved = osn.get("КодОКВЭД") if osn is not None else None
     if okved and okved not in stats.okved_names:
         stats.okved_names[okved] = osn.get("НаимОКВЭД", "")
+    ver = osn.get("ВерсОКВЭД") if osn is not None else None
     if osn is not None:
-        stats.okved_versions[osn.get("ВерсОКВЭД", "")] += 1
+        stats.okved_versions[ver or ""] += 1
     stats.docs_parsed += 1
     stats.no_inn += inn is None
     stats.no_okved += okved is None
-    snap = _date(el.get("ДатаСост"))
-    stats.snapshot_dates[snap] += 1
+    state = _date(el.get("ДатаСост"))
+    stats.snapshot_dates[state] += 1
     return {
-        "snapshot_date": snap,
+        # ДатаСост у части документов старше снимка (запись не менялась) — субъект всё равно в снимке.
+        "snapshot_date": snapshot_date or state,
         "inn": inn,
         "kind": _int(el.get("ВидСубМСП")),
         "category": _int(el.get("КатСубМСП")),
@@ -94,11 +97,13 @@ def _row(el: etree._Element, stats: Stats) -> dict:
         "is_new": el.get("ПризНовМСП") == "1",
         "region_id": (mn.get("КодРегион") if mn is not None else None),
         "okved": okved,
+        "okved_ver": ver,
     }
 
 
-def parse_zip(zip_path: str | Path, out_path: str | Path) -> Stats:
-    """Пишет Parquet батчами, держит в памяти не больше BATCH строк."""
+def parse_zip(zip_path: str | Path, out_path: str | Path, snapshot_date: dt.date | None = None) -> Stats:
+    """Пишет Parquet батчами, держит в памяти не больше BATCH строк.
+    snapshot_date — дата снимка из имени файла; без неё берётся ДатаСост документа."""
     stats = Stats()
     with zipfile.ZipFile(zip_path) as z, pq.ParquetWriter(out_path, SCHEMA, compression="zstd") as w:
         buf: list[dict] = []
@@ -106,7 +111,7 @@ def parse_zip(zip_path: str | Path, out_path: str | Path) -> Stats:
             if not info.filename.lower().endswith(".xml"):
                 continue
             with z.open(info) as xml:
-                for row in iter_documents(xml, stats):
+                for row in iter_documents(xml, stats, snapshot_date):
                     buf.append(row)
                     if len(buf) >= BATCH:
                         w.write_table(pa.Table.from_pylist(buf, SCHEMA))

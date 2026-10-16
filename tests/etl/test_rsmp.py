@@ -12,13 +12,14 @@ from rf_etl.rsmp import marts, parse, versions
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _doc(inn: str, region: str, okved: str, incl: str, snap: str, new: bool = False, ip: bool = False) -> str:
+def _doc(inn: str, region: str, okved: str, incl: str, snap: str, new: bool = False, ip: bool = False,
+         ver: str = "2014") -> str:
     who = (f'<ИПВклМСП ИННФЛ="{inn}" ОГРНИП="1"><ФИОИП Фамилия="X" Имя="Y"/></ИПВклМСП>' if ip
            else f'<ОргВклМСП НаимОрг="ООО" ИННЮЛ="{inn}" ОГРН="1"/>')
     return (f'<Документ ИдДок="{inn}" ДатаСост="{snap}" ДатаВклМСП="{incl}" ВидСубМСП="{2 if ip else 1}" '
             f'КатСубМСП="1" ПризНовМСП="{1 if new else 2}">{who}'
             f'<СведМН КодРегион="{region}"><Регион Тип="Г" Наим="Москва"/></СведМН>'
-            f'<СвОКВЭД><СвОКВЭДОсн КодОКВЭД="{okved}" НаимОКВЭД="name {okved}" ВерсОКВЭД="2014"/>'
+            f'<СвОКВЭД><СвОКВЭДОсн КодОКВЭД="{okved}" НаимОКВЭД="name {okved}" ВерсОКВЭД="{ver}"/>'
             f'<СвОКВЭДДоп КодОКВЭД="47.11" НаимОКВЭД="доп" ВерсОКВЭД="2014"/></СвОКВЭД></Документ>')
 
 
@@ -42,6 +43,8 @@ def slim(tmp_path: Path) -> Path:
         _doc("7703", "77", "96.02.1", "15.08.2024", s1, new=True),  # когорта, закроется
         _doc("7704", "77", "96.02.1", "10.08.2024", s1),            # не новый: вне когорты
         _doc("500000000001", "50", "01.11", "10.08.2016", s1, ip=True),  # вне таксономии
+        _doc("7707", "81", "56.10", "10.08.2016", "10.03.2023"),  # старый код региона, старая ДатаСост
+        _doc("7708", "77", "56.10", "10.08.2016", s1, ver="2001"),  # ОКВЭД-2001: только '_all'
     ]
     snap2 = [
         _doc("7701", "77", "56.10.1", "10.08.2016", s2),
@@ -52,10 +55,10 @@ def slim(tmp_path: Path) -> Path:
     ]
     out = tmp_path / "slim"
     out.mkdir()
-    for name, docs in (("a", snap1), ("b", snap2)):
+    for name, docs, date in (("a", snap1, dt.date(2024, 10, 10)), ("b", snap2, None)):
         z = _zip(tmp_path / f"{name}.zip", docs)
-        st = parse.parse_zip(z, out / f"rsmp_{name}.parquet")
-        assert st.docs_parsed == st.docs_declared == 5
+        st = parse.parse_zip(z, out / f"rsmp_{name}.parquet", date)
+        assert st.docs_parsed == st.docs_declared == len(docs)
     return out
 
 
@@ -63,7 +66,9 @@ def test_parse_has_no_personal_names(slim: Path):
     cols = duckdb.sql(f"SELECT * FROM '{slim}/rsmp_a.parquet' LIMIT 1").columns
     assert set(cols) == {f.name for f in parse.SCHEMA}
     row = duckdb.sql(f"SELECT * FROM '{slim}/rsmp_a.parquet' WHERE inn='7702'").fetchone()
-    assert row == (dt.date(2024, 10, 10), "7702", 1, 1, dt.date(2024, 9, 1), True, "77", "56.10")
+    assert row == (dt.date(2024, 10, 10), "7702", 1, 1, dt.date(2024, 9, 1), True, "77", "56.10", "2014")
+    stale = duckdb.sql(f"SELECT snapshot_date FROM '{slim}/rsmp_a.parquet' WHERE inn='7707'").fetchone()
+    assert stale == (dt.date(2024, 10, 10),)  # дата снимка из имени файла, а не ДатаСост
 
 
 def test_marts(slim: Path, tmp_path: Path):
@@ -74,7 +79,10 @@ def test_marts(slim: Path, tmp_path: Path):
     assert q("SELECT active FROM '$/msp_active.parquet' WHERE snapshot_date='2025-10-10' "
              "AND region_id='77' AND need_id='restaurants_cafes'") == [(3,)]
     assert q("SELECT active FROM '$/msp_active.parquet' WHERE snapshot_date='2024-10-10' "
-             "AND region_id='77' AND need_id='_all'") == [(4,)]
+             "AND region_id='77' AND need_id='_all'") == [(5,)]
+    assert q("SELECT need_id, active FROM '$/msp_active.parquet' WHERE snapshot_date='2024-10-10' "
+             "AND region_id='59' ORDER BY 1") == [("_all", 1), ("restaurants_cafes", 1)]
+    assert rep["legacy_regions_mapped"] == [("81", 1)]
 
     (g,) = q("SELECT net_growth_log FROM '$/msp_growth_12m.parquet' "
              "WHERE region_id='77' AND need_id='restaurants_cafes'")
@@ -84,7 +92,7 @@ def test_marts(slim: Path, tmp_path: Path):
              "WHERE region_id='77' ORDER BY need_id")
     assert surv == [("_all", 2, 1), ("hair_barbershops", 1, 0), ("restaurants_cafes", 1, 1)]
     assert rep["unknown_regions"] == []
-    assert len(rep["missing_regions"]) == 87
+    assert len(rep["missing_regions"]) == 86  # есть 77, 50 и 59 (из старого кода 81)
 
 
 def test_check_download_rejects_stub(tmp_path: Path):

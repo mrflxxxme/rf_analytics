@@ -19,6 +19,8 @@ import duckdb
 from rf_etl import taxonomy as tx
 
 ALL = "_all"
+# Коды ФНС упразднённых субъектов (объединения 2005–2008) → нынешний субъект. Встречаются в старых снимках.
+LEGACY_REGIONS = {"80": "75", "81": "59", "82": "41", "84": "24", "85": "38", "88": "24"}
 
 
 def _okved_map(con: duckdb.DuckDBPyConnection, tax: tx.Taxonomy) -> None:
@@ -41,11 +43,16 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
     files = sorted(str(p) for p in Path(slim_dir).glob("rsmp_*.parquet"))
     if not files:
         raise FileNotFoundError(f"нет rsmp_*.parquet в {slim_dir}")
-    con.execute(f"CREATE VIEW msp AS SELECT * FROM read_parquet({files!r})")
+    con.execute(f"CREATE VIEW raw AS SELECT * FROM read_parquet({files!r}, union_by_name = true)")
+    legacy = {k: v for k, v in LEGACY_REGIONS.items() if k not in known_regions}
+    case = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in legacy.items())
+    region = f"CASE region_id {case} ELSE region_id END" if legacy else "region_id"
+    con.execute(f"CREATE VIEW msp AS SELECT * REPLACE ({region} AS region_id) FROM raw")
     _okved_map(con, tax)
+    # Таксономия задана в ОКВЭД2; коды ОКВЭД-2001 (снимок 2016) попадают только в '_all'.
     con.execute("""
         CREATE TABLE m AS
-        SELECT msp.*, coalesce(n.need_id, NULL) AS need_id
+        SELECT msp.*, CASE WHEN coalesce(msp.okved_ver, '2014') = '2014' THEN n.need_id END AS need_id
         FROM msp LEFT JOIN okved_need n USING (okved)""")
 
     con.execute(f"""
@@ -97,6 +104,8 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
 
     totals = con.execute("SELECT snapshot_date, count(*) FROM m GROUP BY 1 ORDER BY 1").fetchall()
     unknown = con.execute("SELECT region_id, count(*) FROM m GROUP BY 1").fetchall()
+    legacy_n = con.execute("SELECT region_id, count(*) FROM raw WHERE region_id IN "
+                           f"({','.join(repr(k) for k in legacy) or 'NULL'}) GROUP BY 1").fetchall()
     needs_below = con.execute(f"""
         SELECT need_id, sum(active) FROM msp_active
         WHERE snapshot_date = ? AND need_id <> '{ALL}' GROUP BY 1""", [latest]).fetchall()
@@ -105,6 +114,7 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
         "snapshots": [(str(d), n) for d, n in totals],
         "unknown_regions": sorted((r, n) for r, n in unknown if r not in known_regions),
         "missing_regions": sorted(known_regions - {r for r, _ in unknown}),
+        "legacy_regions_mapped": sorted(legacy_n),
         "taxonomy_coverage_latest": round(sum(per_need.values()) / totals[-1][1], 4),
         "needs_below_threshold": sorted(
             (n.id, int(per_need.get(n.id, 0)), tax.threshold(n)) for n in tax.needs

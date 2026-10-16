@@ -56,9 +56,11 @@ def cmd_parse(a: argparse.Namespace) -> int:
     _download(a.url, zpath)
     t1 = time.monotonic()
     tmp = out / "rsmp_tmp.parquet"
-    stats = parse.parse_zip(zpath, tmp)
+    m = versions.NAME.search(a.url)
+    file_date = versions.parse_date(m.group(1)) if m else None
+    stats = parse.parse_zip(zpath, tmp, file_date)
     zpath.unlink()
-    snap_date = stats.snapshot_dates.most_common(1)[0][0]
+    snap_date = file_date or stats.snapshot_dates.most_common(1)[0][0]
     final = out / f"rsmp_{snap_date}.parquet"
     tmp.replace(final)
     report = {
