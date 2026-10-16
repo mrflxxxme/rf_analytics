@@ -23,6 +23,7 @@ jobs:
       - name: Probe
         run: python scripts/probe_sources.py --vantage actions --out probe-actions.json
       - name: Probe from server (RU IP), read-only, nothing is written there
+        continue-on-error: true  # до установки ключа деплоя для deploy (T1.3)
         env:
           SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
