@@ -3,26 +3,42 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import shutil
 import sys
 import time
 import urllib.request
+import zipfile
 from pathlib import Path
 
 from rf_etl.rsmp import marts, parse, versions
 
 
-def _download(url: str, dst: Path, retries: int = 3) -> None:
+def _check_download(dst: Path, expected: int) -> None:
+    """file.nalog.ru под нагрузкой иногда отдаёт 200 с обрывком или заглушкой вместо ZIP."""
+    size = dst.stat().st_size
+    if expected and size != expected:
+        raise OSError(f"получено {size} из {expected} байт")
+    if not zipfile.is_zipfile(dst):
+        with open(dst, "rb") as f:
+            head = f.read(200)
+        raise OSError(f"не ZIP ({size} байт): {head!r}")
+
+
+def _download(url: str, dst: Path, retries: int = 5) -> None:
     for attempt in range(1, retries + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": versions.UA})
             with urllib.request.urlopen(req, timeout=120) as r, open(dst, "wb") as f:
+                expected = int(r.headers.get("Content-Length") or 0)
                 shutil.copyfileobj(r, f, length=8 << 20)
+            _check_download(dst, expected)
+            print(f"downloaded {dst.stat().st_size} bytes", file=sys.stderr)
             return
-        except OSError as e:
+        except (OSError, http.client.HTTPException) as e:
             print(f"download attempt {attempt} failed: {e}", file=sys.stderr)
-            time.sleep(30 * attempt)
+            time.sleep(60 * attempt)
     raise RuntimeError(f"не скачали {url}")
 
 

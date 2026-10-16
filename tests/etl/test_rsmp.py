@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from rf_etl import cli
 from rf_etl.rsmp import marts, parse, versions
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,6 +85,17 @@ def test_marts(slim: Path, tmp_path: Path):
     assert surv == [("_all", 2, 1), ("hair_barbershops", 1, 0), ("restaurants_cafes", 1, 1)]
     assert rep["unknown_regions"] == []
     assert len(rep["missing_regions"]) == 87
+
+
+def test_check_download_rejects_stub(tmp_path: Path):
+    ok = _zip(tmp_path / "ok.zip", [_doc("7701", "77", "56.10", "10.08.2016", "10.10.2025")] * 2)
+    cli._check_download(ok, ok.stat().st_size)
+    stub = tmp_path / "stub.zip"
+    stub.write_bytes(b"<html>busy</html>")
+    with pytest.raises(OSError, match="не ZIP"):
+        cli._check_download(stub, 0)
+    with pytest.raises(OSError, match="получено"):
+        cli._check_download(ok, ok.stat().st_size + 1)
 
 
 def test_snapshot_name_dates():
