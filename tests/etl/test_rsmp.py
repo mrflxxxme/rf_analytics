@@ -90,7 +90,7 @@ def test_marts(slim: Path, tmp_path: Path):
 
     surv = q("SELECT need_id, cohort_n, survived_n FROM '$/msp_survival_12m.parquet' "
              "WHERE region_id='77' ORDER BY need_id")
-    assert surv == [("_all", 2, 1), ("hair_barbershops", 1, 0), ("restaurants_cafes", 1, 1)]
+    assert surv == [("_all", 2, 1), ("beauty_salons", 1, 0), ("restaurants_cafes", 1, 1)]
     assert rep["unknown_regions"] == []
     assert len(rep["missing_regions"]) == 86  # есть 77, 50 и 59 (из старого кода 81)
 
