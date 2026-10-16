@@ -52,7 +52,7 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
     # Таксономия задана в ОКВЭД2; коды ОКВЭД-2001 (снимок 2016) попадают только в '_all'.
     con.execute("""
         CREATE TABLE m AS
-        SELECT msp.*, CASE WHEN coalesce(msp.okved_ver, '2014') = '2014' THEN n.need_id END AS need_id
+        SELECT msp.*, CASE WHEN msp.okved_ver = '2014' THEN n.need_id END AS need_id
         FROM msp LEFT JOIN okved_need n USING (okved)""")
 
     con.execute(f"""
@@ -112,7 +112,8 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
     per_need = dict(needs_below)
     return {
         "snapshots": [(str(d), n) for d, n in totals],
-        "unknown_regions": sorted((r, n) for r, n in unknown if r not in known_regions),
+        # region_id бывает NULL (нет СведМН) — сортируем по строке, иначе None < str падает.
+        "unknown_regions": sorted(((r, n) for r, n in unknown if r not in known_regions), key=lambda x: str(x[0])),
         "missing_regions": sorted(known_regions - {r for r, _ in unknown}),
         "legacy_regions_mapped": sorted(legacy_n),
         "taxonomy_coverage_latest": round(sum(per_need.values()) / totals[-1][1], 4),

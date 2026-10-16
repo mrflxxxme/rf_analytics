@@ -35,12 +35,17 @@ def parse_date(token: str) -> dt.date:
     return dt.date(year, b, a)  # прочие даты — DDMMYYYY
 
 
+def _structure_key(token: str) -> tuple[str, str, str]:
+    """Версия XSD в имени — DDMMYYYY; сравниваем как дату, а не как строку."""
+    return token[4:], token[2:4], token[:2]
+
+
 def parse_listing(html: str) -> list[Snapshot]:
     seen: dict[dt.date, Snapshot] = {}
     for m in NAME.finditer(html):
         snap = Snapshot(parse_date(m.group(1)), m.group(2), m.group(0))
         prev = seen.get(snap.date)
-        if prev is None or snap.structure > prev.structure:
+        if prev is None or _structure_key(snap.structure) > _structure_key(prev.structure):
             seen[snap.date] = snap
     return sorted(seen.values())
 

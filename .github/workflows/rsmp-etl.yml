@@ -22,8 +22,9 @@ permissions:
   contents: read
 
 # opened + labeled на один коммит дают два запуска — тяжёлая матрица идёт один раз.
+# Посторонняя метка получает свою группу и ничего не отменяет; dispatch с другим spec — тоже.
 concurrency:
-  group: rsmp-etl-${{ github.ref }}
+  group: rsmp-etl-${{ github.ref }}-${{ inputs.spec || 'pr' }}${{ github.event.action == 'labeled' && github.event.label.name != 'run-etl' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
@@ -42,7 +43,10 @@ jobs:
 
   plan:
     needs: test
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-etl')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'run-etl') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'run-etl'))
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.v.outputs.matrix }}
@@ -80,7 +84,9 @@ jobs:
 
   marts:
     needs: parse
-    if: always() && needs.parse.result != 'skipped'
+    # Только полная матрица: пропущенный снимок молча выбил бы годы из роста и выживаемости.
+    # Упавшие снимки — «Re-run failed jobs», marts пересоберётся.
+    if: needs.parse.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +108,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: marts
+          overwrite: true
           path: |
             marts/
             slim/*.stats.json

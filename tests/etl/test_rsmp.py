@@ -113,6 +113,6 @@ def test_snapshot_name_dates():
     html = ('<a href="data-10102026-structure-12052026.zip"></a>'
             '<a href="data-01102017-structure-08012016.zip"></a>'
             '<a href="data-10102025-structure-10062025.zip"></a>')
-    snaps = versions.parse_listing(html)
+    snaps = versions.parse_listing(html + '<a href="data-10102026-structure-30012026.zip"></a>')
     assert [s.date.year for s in versions.select(snaps, "annual")] == [2025, 2026]
     assert versions.select(snaps, "latest")[0].url.endswith("data-10102026-structure-12052026.zip")
