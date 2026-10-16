@@ -1,0 +1,361 @@
+# Таксономия потребностей RADAR (T1.7, D4, D24, D31). ЧЕРНОВИК — до утверждения автором.
+#
+# id (need_id) — стабильный публичный идентификатор (D31): после публикации не
+# переименовывается и не переиспользуется. Меняется только name. Снятая
+# потребность получает status: retired и остаётся в файле.
+#
+# okved — префиксы кодов ОКВЭД2 (основной вид деятельности в реестре МСП):
+# "56.10" включает 56.10 и все 56.10.x. Пересечение кодов между потребностями
+# запрещено (тест), пока у кода нет явной доли (поле okved_share, п. 1 03-methodology.md).
+# Критерий D24: есть франчайзинг × измеримо через ОКВЭД и поиск × хватает событий.
+# min_entities_rf — порог активных субъектов МСП по РФ; проверяется по витрине ETL.
+
+version: 0.1.0
+status: draft
+defaults:
+  min_entities_rf: 2000
+
+needs:
+  # --- Общепит и продукты
+  - id: restaurants_cafes
+    name: Кафе, рестораны, кофейни, фастфуд
+    okved: ["56.10"]
+    osm_tags: [amenity=restaurant, amenity=cafe, amenity=fast_food]
+    search_keys: [кафе рядом, кофейня, доставка еды]
+    franchise_examples: [Додо Пицца, Coffee Like, Теремок]
+  - id: bars_pubs
+    name: Бары и пабы
+    okved: ["56.30"]
+    osm_tags: [amenity=bar, amenity=pub]
+    search_keys: [бар, паб, крафтовое пиво бар]
+    franchise_examples: []
+  - id: catering_canteens
+    name: Кейтеринг и столовые
+    okved: ["56.21", "56.29"]
+    osm_tags: [amenity=canteen]
+    search_keys: [кейтеринг, столовая, комплексные обеды]
+    franchise_examples: []
+  - id: bakery_confectionery
+    name: Пекарни и кондитерские
+    okved: ["10.71", "47.24"]
+    osm_tags: [shop=bakery, shop=pastry, shop=confectionery]
+    search_keys: [пекарня, кондитерская, торты на заказ]
+    franchise_examples: [Хлеб Насущный, Буханка]
+  - id: grocery_convenience
+    name: Продуктовые магазины у дома
+    okved: ["47.11"]
+    osm_tags: [shop=convenience, shop=supermarket]
+    search_keys: [продуктовый магазин, магазин у дома]
+    franchise_examples: [Магнит (франчайзинг), Абсолют]
+  - id: produce_shops
+    name: Овощи и фрукты
+    okved: ["47.21"]
+    osm_tags: [shop=greengrocer]
+    search_keys: [овощной магазин, фрукты]
+    franchise_examples: []
+  - id: meat_fish_shops
+    name: Мясные и рыбные лавки
+    okved: ["47.22", "47.23"]
+    osm_tags: [shop=butcher, shop=seafood]
+    search_keys: [мясная лавка, рыбный магазин, фермерское мясо]
+    franchise_examples: []
+  - id: beverages_retail
+    name: Магазины напитков, разливное пиво
+    okved: ["47.25"]
+    osm_tags: [shop=alcohol, shop=beverages]
+    search_keys: [разливное пиво, магазин напитков]
+    franchise_examples: [Пив&Ко]
+  - id: specialty_food
+    name: Специализированные продукты (чай, кофе, здоровое питание)
+    okved: ["47.29"]
+    osm_tags: [shop=tea, shop=coffee, shop=health_food]
+    search_keys: [чай кофе магазин, здоровое питание магазин]
+    franchise_examples: []
+
+  # --- Розница непродовольственная
+  - id: discount_variety
+    name: Магазины низких цен и товаров повседневного спроса
+    okved: ["47.19"]
+    osm_tags: [shop=variety_store, shop=general]
+    search_keys: [магазин фиксированных цен, хозтовары]
+    franchise_examples: [Fix Price]
+  - id: apparel_retail
+    name: Одежда
+    okved: ["47.71"]
+    osm_tags: [shop=clothes]
+    search_keys: [магазин одежды]
+    franchise_examples: [Gloria Jeans, Твоё]
+  - id: footwear_leather
+    name: Обувь и кожгалантерея
+    okved: ["47.72"]
+    osm_tags: [shop=shoes, shop=bag]
+    search_keys: [магазин обуви]
+    franchise_examples: [Kari]
+  - id: cosmetics_retail
+    name: Косметика и парфюмерия
+    okved: ["47.75"]
+    osm_tags: [shop=cosmetics, shop=perfumery, shop=chemist]
+    search_keys: [магазин косметики, парфюмерия]
+    franchise_examples: []
+  - id: jewelry_watches
+    name: Ювелирные изделия и часы
+    okved: ["47.77"]
+    osm_tags: [shop=jewelry, shop=watches]
+    search_keys: [ювелирный магазин]
+    franchise_examples: [SOKOLOV, 585 Золотой]
+  - id: secondhand_retail
+    name: Секонд-хенд и комиссионные магазины
+    okved: ["47.79"]
+    osm_tags: [shop=second_hand, shop=charity]
+    search_keys: [секонд хенд, комиссионный магазин]
+    franchise_examples: []
+  - id: toys_kids_goods
+    name: Игрушки и детские товары
+    okved: ["47.65"]
+    osm_tags: [shop=toys, shop=baby_goods]
+    search_keys: [магазин игрушек]
+    franchise_examples: []
+  - id: sport_retail
+    name: Спортивные товары
+    okved: ["47.64"]
+    osm_tags: [shop=sports, shop=outdoor, shop=bicycle]
+    search_keys: [спортивный магазин, велосипеды]
+    franchise_examples: []
+  - id: books_stationery
+    name: Книги и канцтовары
+    okved: ["47.61", "47.62"]
+    osm_tags: [shop=books, shop=stationery]
+    search_keys: [книжный магазин, канцтовары]
+    franchise_examples: []
+  - id: electronics_appliances_retail
+    name: Телефоны, электроника и бытовая техника
+    okved: ["47.41", "47.42", "47.43", "47.54"]
+    osm_tags: [shop=mobile_phone, shop=electronics, shop=computer, shop=appliance]
+    search_keys: [купить телефон, магазин электроники, бытовая техника]
+    franchise_examples: []
+  - id: home_goods_retail
+    name: Товары для дома, текстиль, мебель
+    okved: ["47.51", "47.53", "47.59"]
+    osm_tags: [shop=furniture, shop=houseware, shop=interior_decoration, shop=fabric]
+    search_keys: [товары для дома, мебельный магазин, шторы]
+    franchise_examples: []
+  - id: diy_building_retail
+    name: Стройматериалы и хозтовары
+    okved: ["47.52"]
+    osm_tags: [shop=doityourself, shop=hardware, shop=paint]
+    search_keys: [строительный магазин, стройматериалы]
+    franchise_examples: []
+  - id: flowers_plants
+    name: Цветы и растения
+    okved: ["47.76.1"]
+    osm_tags: [shop=florist, shop=garden_centre]
+    search_keys: [цветы доставка, цветочный магазин]
+    franchise_examples: []
+  - id: pet_retail
+    name: Зоотовары и корма
+    okved: ["47.76.2"]
+    osm_tags: [shop=pet]
+    search_keys: [зоомагазин, корм для собак]
+    franchise_examples: []
+  - id: pharmacies
+    name: Аптеки
+    okved: ["47.73"]
+    osm_tags: [amenity=pharmacy]
+    search_keys: [аптека рядом]
+    franchise_examples: [Апрель]
+  - id: medical_goods_orthopedics
+    name: Медицинские и ортопедические товары
+    okved: ["47.74"]
+    osm_tags: [shop=medical_supply]
+    search_keys: [ортопедический салон, медтехника]
+    franchise_examples: []
+
+  # --- Авто и транспорт
+  - id: auto_parts_retail
+    name: Автозапчасти
+    okved: ["45.32"]
+    osm_tags: [shop=car_parts]
+    search_keys: [автозапчасти, магазин запчастей]
+    franchise_examples: []
+  - id: car_service
+    name: Автосервис и шиномонтаж
+    okved: ["45.20.1", "45.20.2"]
+    osm_tags: [shop=car_repair, shop=tyres]
+    search_keys: [автосервис, шиномонтаж]
+    franchise_examples: [Fit Service]
+  - id: car_wash
+    name: Автомойки и детейлинг
+    okved: ["45.20.3"]
+    osm_tags: [amenity=car_wash]
+    search_keys: [автомойка, детейлинг]
+    franchise_examples: []
+  - id: taxi
+    name: Такси
+    okved: ["49.32"]
+    osm_tags: [amenity=taxi]
+    search_keys: [такси, работа в такси]
+    franchise_examples: []
+  - id: pickup_points_courier
+    name: Пункты выдачи заказов и курьерская доставка
+    okved: ["53.20"]
+    osm_tags: [amenity=parcel_locker, shop=outpost]
+    search_keys: [открыть пвз, пункт выдачи заказов]
+    franchise_examples: [ПВЗ Ozon, ПВЗ Wildberries, СДЭК]
+
+  # --- Красота, здоровье, спорт
+  - id: hair_barbershops
+    name: Парикмахерские и барбершопы
+    okved: ["96.02.1"]
+    osm_tags: [shop=hairdresser]
+    search_keys: [барбершоп, парикмахерская]
+    franchise_examples: [OldBoy, TOPGUN, Чио Чио]
+  - id: nails_cosmetology
+    name: Маникюр и косметические услуги
+    okved: ["96.02.2"]
+    osm_tags: [shop=beauty]
+    search_keys: [маникюр, косметолог, наращивание ресниц]
+    franchise_examples: [Пальчики]
+  - id: wellness_spa_saunas
+    name: Бани, сауны, СПА, массаж, солярии
+    okved: ["96.04"]
+    osm_tags: [leisure=sauna, amenity=public_bath, shop=massage]
+    search_keys: [баня, сауна, спа, массаж]
+    franchise_examples: []
+  - id: fitness_clubs
+    name: Фитнес-клубы и студии
+    okved: ["93.13"]
+    osm_tags: [leisure=fitness_centre]
+    search_keys: [фитнес клуб, тренажерный зал, йога студия]
+    franchise_examples: [DDX Fitness, X-Fit]
+  - id: dental_clinics
+    name: Стоматологии
+    okved: ["86.23"]
+    osm_tags: [amenity=dentist, healthcare=dentist]
+    search_keys: [стоматология, имплантация зубов]
+    franchise_examples: []
+  - id: medical_clinics
+    name: Частные клиники и врачебная практика
+    okved: ["86.21", "86.22"]
+    osm_tags: [amenity=clinic, amenity=doctors]
+    search_keys: [частная клиника, прием врача]
+    franchise_examples: []
+  - id: medical_labs_other
+    name: Лаборатории и прочая медицина
+    okved: ["86.90"]
+    osm_tags: [healthcare=laboratory]
+    search_keys: [сдать анализы, медицинская лаборатория]
+    franchise_examples: [Инвитро, Гемотест, CMD]
+  - id: veterinary
+    name: Ветеринарные клиники
+    okved: ["75.00"]
+    osm_tags: [amenity=veterinary]
+    search_keys: [ветклиника, ветеринар]
+    franchise_examples: []
+  - id: elderly_care
+    name: Уход за пожилыми, частные пансионаты
+    okved: ["87.30", "88.10"]
+    osm_tags: [social_facility=nursing_home, social_facility=assisted_living]
+    search_keys: [пансионат для пожилых, сиделка]
+    franchise_examples: []
+
+  # --- Дети и образование
+  - id: childcare_kindergartens
+    name: Частные детские сады и присмотр за детьми
+    okved: ["88.91", "85.11"]
+    osm_tags: [amenity=kindergarten, amenity=childcare]
+    search_keys: [частный детский сад, присмотр за детьми]
+    franchise_examples: []
+  - id: kids_sports
+    name: Спортивные секции и школы
+    okved: ["85.41.1"]
+    osm_tags: [leisure=sports_centre]
+    search_keys: [спортивная секция для детей, футбол для детей]
+    franchise_examples: [Чемпионика]
+  - id: creative_education
+    name: Творческие школы (музыка, танцы, рисование)
+    okved: ["85.41.2"]
+    osm_tags: [amenity=music_school, leisure=dance, amenity=dancing_school]
+    search_keys: [школа рисования, танцы для детей, уроки вокала]
+    franchise_examples: [Арт-Квартал]
+  - id: additional_education
+    name: Развивающие центры, языки, программирование
+    okved: ["85.41.9"]
+    osm_tags: [amenity=language_school, amenity=prep_school]
+    search_keys: [английский для детей, программирование для детей, развивающий центр]
+    franchise_examples: [Алгоритмика, KIBERone, Пифагорка]
+  - id: driving_schools
+    name: Автошколы
+    okved: ["85.42.1"]
+    osm_tags: [amenity=driving_school]
+    search_keys: [автошкола]
+    franchise_examples: []
+  - id: leisure_entertainment
+    name: "Развлечения: квесты, батуты, игровые центры"
+    okved: ["93.21", "93.29"]
+    osm_tags: [leisure=amusement_arcade, leisure=trampoline_park, leisure=escape_game]
+    search_keys: [квест, батутный центр, детский день рождения]
+    franchise_examples: []
+
+  # --- Быт и дом
+  - id: laundry_drycleaning
+    name: Химчистки и прачечные
+    okved: ["96.01"]
+    osm_tags: [shop=dry_cleaning, shop=laundry]
+    search_keys: [химчистка, прачечная]
+    franchise_examples: []
+  - id: device_repair
+    name: Ремонт телефонов, компьютеров и техники
+    okved: ["95.11", "95.12", "95.21", "95.22"]
+    osm_tags: [craft=electronics_repair, shop=mobile_phone_repair]
+    search_keys: [ремонт телефонов, ремонт ноутбуков, ремонт стиральных машин]
+    franchise_examples: [Pedant.ru]
+  - id: cleaning_services
+    name: Клининг
+    okved: ["81.21", "81.22", "81.29"]
+    osm_tags: []
+    search_keys: [клининг, уборка квартир]
+    franchise_examples: []
+  - id: home_renovation
+    name: Ремонт и отделка квартир
+    okved: ["43.31", "43.32", "43.33", "43.34", "43.39"]
+    osm_tags: [craft=painter, craft=tiler, craft=plasterer]
+    search_keys: [ремонт квартир под ключ, отделка квартиры]
+    franchise_examples: []
+  - id: custom_furniture
+    name: Мебель на заказ, кухни
+    okved: ["31.02", "31.09"]
+    osm_tags: [craft=cabinet_maker, shop=kitchen]
+    search_keys: [кухни на заказ, шкаф купе на заказ]
+    franchise_examples: [Мария, Стильные кухни]
+
+  # --- Туризм, недвижимость, услуги бизнесу
+  - id: hostels_mini_hotels
+    name: Гостиницы, мини-отели, хостелы
+    okved: ["55.10", "55.20"]
+    osm_tags: [tourism=hotel, tourism=hostel, tourism=guest_house]
+    search_keys: [гостиница, хостел, мини отель]
+    franchise_examples: [Like Hostel]
+  - id: glamping_campsites
+    name: Глэмпинги и кемпинги
+    okved: ["55.30"]
+    osm_tags: [tourism=camp_site]
+    search_keys: [глэмпинг, кемпинг]
+    franchise_examples: []
+  - id: travel_agencies
+    name: Турагентства
+    okved: ["79.11"]
+    osm_tags: [shop=travel_agency]
+    search_keys: [турагентство, горящие туры]
+    franchise_examples: [Горячие туры, ВЕДИ]
+  - id: real_estate_agencies
+    name: Агентства недвижимости
+    okved: ["68.31"]
+    osm_tags: [office=estate_agent]
+    search_keys: [агентство недвижимости, риелтор]
+    franchise_examples: [Этажи, Century 21]
+  - id: accounting_services
+    name: Бухгалтерские услуги
+    okved: ["69.20"]
+    osm_tags: [office=accountant]
+    search_keys: [бухгалтерские услуги, бухгалтер для ип]
+    franchise_examples: []
