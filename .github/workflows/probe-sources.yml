@@ -1,0 +1,28 @@
+name: probe-sources
+
+# T1.1: доступность источников с зарубежного IP раннера GitHub.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/probe_sources.py
+      - .github/workflows/probe-sources.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe
+        run: python scripts/probe_sources.py --vantage actions --out probe-actions.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-actions
+          path: probe-actions.json
