@@ -22,7 +22,18 @@ jobs:
           python-version: "3.12"
       - name: Probe
         run: python scripts/probe_sources.py --vantage actions --out probe-actions.json
+      - name: Probe from server (RU IP), read-only, nothing is written there
+        env:
+          SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=30 deploy@194.87.187.207 \
+            'python3 - --vantage server' < scripts/probe_sources.py > probe-server.json
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: probe-actions
-          path: probe-actions.json
+          name: probe-results
+          path: probe-*.json

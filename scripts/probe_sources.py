@@ -26,19 +26,25 @@ PAUSE_S = 1.0  # пауза между запросами, чтобы не на�
 # (source_id, url, extra headers). Список держим в синхроне с config/sources.yaml.
 TARGETS: list[tuple[str, str, dict[str, str]]] = [
     ("fns_rsmp", "https://www.nalog.gov.ru/opendata/7707329152-rsmp/", {}),
-    ("fns_rsmp", "https://file.nalog.ru/opendata/7707329152-rsmp/data-10092026-structure-10032026.zip", {}),
-    ("fns_rsmp", "https://rmsp.nalog.ru/", {}),
+    ("fns_rsmp", "https://www.nalog.gov.ru/opendata/7707329152-rsmp/meta.csv", {}),
+    ("fns_rsmp", "https://file.nalog.ru/opendata/7707329152-rsmp/data-10102026-structure-12052026.zip", {}),
+    ("fns_rsmp", "https://file.nalog.ru/opendata/7707329152-rsmp/structure-12052026.xsd", {}),
     ("emiss", "https://www.fedstat.ru/indicator/31152", {}),
     ("emiss", "https://fedstat.ru/", {}),
     ("cbr", "https://www.cbr.ru/statistics/bank_sector/sors/", {}),
-    ("cbr", "https://www.cbr.ru/vfs/statistics/banksector/loans_to_corporations/02_02_SME_Borrowers_info.xlsx", {}),
+    ("cbr", "https://www.cbr.ru/vfs/statistics/BankSector/Loans_to_individuals/01_22_Loans_ind_20260901.xlsx", {}),
+    ("cbr", "https://www.cbr.ru/vfs/statistics/BankSector/Borrowings/02_06_Dep_ind.xlsx", {}),
+    ("cbr", "https://www.cbr.ru/vfs/statistics/BankSector/Loans_to_corporations/01_13_F_Debt_sme_subj.xlsx", {}),
     ("sberindex", "https://sberindex.ru/", {}),
+    ("sberindex", "https://api.sberindex.ru/", {}),
+    ("sberindex", "https://www.sberbank.com/common/img/uploaded/files/pdf/sberindex/hackathonlicence.zip", {}),
     ("osm", "https://download.geofabrik.de/russia-latest.osm.pbf", {}),
-    ("osm", "https://download.geofabrik.de/russia-latest.osm.pbf.md5", {}),
+    ("osm", "https://download.geofabrik.de/russia/central-fed-district-latest.osm.pbf", {}),
     ("hh", "https://api.hh.ru/areas/113", {"HH-User-Agent": UA}),
     ("hh", "https://api.hh.ru/vacancies?area=1&per_page=1", {"HH-User-Agent": UA}),
     ("rosstat", "https://rosstat.gov.ru/compendium/document/13282", {}),
-    ("rosstat", "https://rosstat.gov.ru/compendium/document/13283", {}),
+    ("rosstat", "https://rosstat.gov.ru/storage/mediabank/BUL_MO_2024.xlsx", {}),
+    ("rosstat_migration", "https://rosstat.gov.ru/storage/mediabank/Bul_migr_2023.xlsx", {}),
 ]
 
 
