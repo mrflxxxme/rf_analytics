@@ -1,0 +1,115 @@
+name: rsmp-etl
+
+# Реестр МСП ФНС → компактные снимки → витрины фактов (D15, D25, D27, D34).
+# Тесты — на каждый PR. Тяжёлый прогон — вручную или по метке PR `run-etl`.
+# Витрины пока публикуются артефактом; rsync на сервер — после T1.3/T1.4.
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "annual | latest | YYYY-MM,YYYY-MM"
+        default: annual
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - etl/**
+      - tests/etl/**
+      - config/taxonomy.yaml
+      - config/geo/regions.csv
+      - .github/workflows/rsmp-etl.yml
+
+permissions:
+  contents: read
+
+# opened + labeled на один коммит дают два запуска — тяжёлая матрица идёт один раз.
+# Посторонняя метка получает свою группу и ничего не отменяет; dispatch с другим spec — тоже.
+concurrency:
+  group: rsmp-etl-${{ github.ref }}-${{ inputs.spec || 'pr' }}${{ github.event.action == 'labeled' && github.event.label.name != 'run-etl' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+env:
+  UV_PROJECT: etl
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --project etl --frozen
+      - run: uv run --project etl pytest -q tests/etl
+
+  plan:
+    needs: test
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'run-etl') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'run-etl'))
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.v.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - id: v
+        run: |
+          m=$(uv run --project etl rf-etl rsmp-versions --spec "${{ inputs.spec || 'annual' }}")
+          echo "$m"
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+
+  parse:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        snap: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv run --project etl rf-etl rsmp-parse --url "${{ matrix.snap.url }}" --out-dir slim
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rsmp-slim-${{ matrix.snap.date }}
+          path: slim/rsmp_*
+          retention-days: 30
+
+  marts:
+    needs: parse
+    # Только полная матрица: пропущенный снимок молча выбил бы годы из роста и выживаемости.
+    # Упавшие снимки — «Re-run failed jobs», marts пересоберётся.
+    if: needs.parse.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rsmp-slim-*
+          path: slim
+          merge-multiple: true
+      - run: uv run --project etl rf-etl rsmp-marts --slim-dir slim --out-dir marts
+      - name: Summary
+        run: |
+          {
+            echo '### rsmp-etl'; echo '```json'; cat marts/report.json; echo '```'
+            echo '#### parse stats'; echo '```'; cat slim/*.stats.json; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marts
+          overwrite: true
+          path: |
+            marts/
+            slim/*.stats.json
+          retention-days: 90
