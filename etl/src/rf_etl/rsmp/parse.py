@@ -37,16 +37,32 @@ class Stats:
     docs_parsed: int = 0
     no_inn: int = 0
     no_okved: int = 0
+    bad_dates: int = 0  # дата не разобралась — поле пустое, строка остаётся
     snapshot_dates: collections.Counter = field(default_factory=collections.Counter)
     okved_names: dict[str, str] = field(default_factory=dict)
     okved_versions: collections.Counter = field(default_factory=collections.Counter)
 
 
-def _date(s: str | None) -> dt.date | None:
+# Допуск на битые записи: выше — снимок считается испорченным (cli вернёт код 2).
+MAX_BAD_SHARE = 0.001
+
+
+def _date(s: str | None, stats: Stats | None = None) -> dt.date | None:
     if not s:
         return None
-    d, m, y = s.split(".")
-    return dt.date(int(y), int(m), int(d))
+    try:
+        d, m, y = s.split(".")
+        return dt.date(int(y), int(m), int(d))
+    except ValueError:
+        if stats is not None:
+            stats.bad_dates += 1
+        return None
+
+
+def is_complete(stats: Stats) -> bool:
+    """Все объявленные документы разобраны, битых дат не больше допуска."""
+    return (stats.docs_parsed == stats.docs_declared
+            and stats.bad_dates <= MAX_BAD_SHARE * max(stats.docs_declared, 1))
 
 
 def _int(s: str | None) -> int | None:
@@ -85,7 +101,7 @@ def _row(el: etree._Element, stats: Stats, snapshot_date: dt.date | None) -> dic
     stats.docs_parsed += 1
     stats.no_inn += inn is None
     stats.no_okved += okved is None
-    state = _date(el.get("ДатаСост"))
+    state = _date(el.get("ДатаСост"), stats)
     stats.snapshot_dates[state] += 1
     return {
         # ДатаСост у части документов старше снимка (запись не менялась) — субъект всё равно в снимке.
@@ -93,7 +109,7 @@ def _row(el: etree._Element, stats: Stats, snapshot_date: dt.date | None) -> dic
         "inn": inn,
         "kind": _int(el.get("ВидСубМСП")),
         "category": _int(el.get("КатСубМСП")),
-        "date_incl": _date(el.get("ДатаВклМСП")),
+        "date_incl": _date(el.get("ДатаВклМСП"), stats),
         "is_new": el.get("ПризНовМСП") == "1",
         "region_id": (mn.get("КодРегион") if mn is not None else None),
         "okved": okved,

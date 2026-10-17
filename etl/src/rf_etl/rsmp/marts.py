@@ -12,6 +12,8 @@ need_id = '_all' — все субъекты региона, в т.ч. вне т
 from __future__ import annotations
 
 import csv
+import os
+import tempfile
 from pathlib import Path
 
 import duckdb
@@ -19,6 +21,8 @@ import duckdb
 from rf_etl import taxonomy as tx
 
 ALL = "_all"
+# Лимит памяти DuckDB: таблица m (все снимки) не влезает в RAM раннера/сервера — излишек уходит на диск.
+MEMORY_LIMIT = os.environ.get("RF_DUCKDB_MEMORY_LIMIT", "3GB")
 # Коды ФНС упразднённых субъектов (объединения 2005–2008) → нынешний субъект. Встречаются в старых снимках.
 LEGACY_REGIONS = {"80": "75", "81": "59", "82": "41", "84": "24", "85": "38", "88": "24"}
 
@@ -31,6 +35,14 @@ def _okved_map(con: duckdb.DuckDBPyConnection, tax: tx.Taxonomy) -> None:
         con.executemany("INSERT INTO okved_need VALUES (?, ?)", rows)
 
 
+def connect(tmp_dir: str | Path) -> duckdb.DuckDBPyConnection:
+    return duckdb.connect(config={
+        "memory_limit": MEMORY_LIMIT,
+        "temp_directory": str(tmp_dir),
+        "preserve_insertion_order": False,
+    })
+
+
 def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Path,
           out_dir: str | Path) -> dict[str, object]:
     out = Path(out_dir)
@@ -39,7 +51,7 @@ def build(slim_dir: str | Path, taxonomy_path: str | Path, regions_csv: str | Pa
     with open(regions_csv, encoding="utf-8") as f:
         known_regions = {r["region_id"] for r in csv.DictReader(f)}
 
-    con = duckdb.connect()
+    con = connect(Path(tempfile.gettempdir()) / "rf_duckdb")  # не в out: каталог витрин уходит артефактом
     files = sorted(str(p) for p in Path(slim_dir).glob("rsmp_*.parquet"))
     if not files:
         raise FileNotFoundError(f"нет rsmp_*.parquet в {slim_dir}")

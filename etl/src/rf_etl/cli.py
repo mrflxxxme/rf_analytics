@@ -66,6 +66,7 @@ def cmd_parse(a: argparse.Namespace) -> int:
     report = {
         "url": a.url, "snapshot_date": str(snap_date), "docs_declared": stats.docs_declared,
         "docs_parsed": stats.docs_parsed, "no_inn": stats.no_inn, "no_okved": stats.no_okved,
+        "bad_dates": stats.bad_dates,
         "snapshot_dates": {str(k): v for k, v in stats.snapshot_dates.items()},
         "okved_versions": dict(stats.okved_versions),
         "download_s": round(t1 - t0), "parse_s": round(time.monotonic() - t1),
@@ -74,7 +75,7 @@ def cmd_parse(a: argparse.Namespace) -> int:
     (out / f"rsmp_{snap_date}.okved_names.json").write_text(
         json.dumps(stats.okved_names, ensure_ascii=False, indent=0), "utf-8")
     print(json.dumps(report, ensure_ascii=False))
-    return 0 if stats.docs_parsed == stats.docs_declared else 2
+    return 0 if parse.is_complete(stats) else 2
 
 
 def cmd_marts(a: argparse.Namespace) -> int:
