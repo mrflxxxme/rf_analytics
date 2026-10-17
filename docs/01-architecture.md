@@ -5,7 +5,7 @@
 ```
                 ┌──────────────── сервер 194.87.187.207 (РФ IP) ────────────────┐
  госисточники ──▶ fetcher (cron, nice/ionice, только сеть+диск)                 │
- (ФНС, ЕМИСС,   │   └─▶ /opt/rf-analytics/raw/<source>/<date>/…                 │
+ (ЕМИСС,        │   └─▶ /opt/rf-analytics/raw/<source>/<date>/…                 │
   закупки…)     │                                                               │
                 │ /opt/rf-analytics/marts/<snapshot>/*.parquet ◀── rsync ──┐    │
                 │      │                                                   │    │
@@ -14,7 +14,7 @@
                 └──────────────────────────────────────────────────────────┼────┘
                                                                            │
  открытые источники без геоблока ──▶ GitHub Actions (monthly-etl.yml) ─────┘
- (СберИндекс, OSM/Geofabrik,          1. rsync raw с сервера (ключ деплоя)
+ (реестр МСП ФНС, OSM,                1. rsync raw с сервера (ключ деплоя)
   Open-Meteo, hh API…)                2. Python + DuckDB: нормализация → признаки → модель → бэктест
                                       3. витрины Parquet (десятки МБ) + отчёт бэктеста
                                       4. rsync витрин на сервер, атомарное переключение snapshot
