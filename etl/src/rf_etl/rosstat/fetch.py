@@ -1,6 +1,8 @@
 """Загрузка файлов Росстата для `region_profile` (config/sources.yaml: rosstat_*).
 
 rosstat.gov.ru и showdata.rosstat.gov.ru открыты с зарубежных IP — качаем в GitHub Actions.
+Их сертификаты выданы НУЦ Минцифры: цепочка (config/certs/*.pem) добавляется к системным корням
+только в контексте этих запросов.
 Имена xlsx меняются с выпуском, поэтому ссылку на свежий файл ищем на странице раздела;
 если страница не ответила — берём последнее известное имя.
 """
@@ -12,6 +14,7 @@ import hashlib
 import http.client
 import json
 import re
+import ssl
 import sys
 import time
 import urllib.request
@@ -32,6 +35,7 @@ POPUL_PAGE = "https://rosstat.gov.ru/folder/12781"
 OKPOPUL_RE = re.compile(r"/storage/mediabank/(OkPopul_Comp(\d{4})_Site\.xlsx)")
 OKPOPUL_FALLBACK = "OkPopul_Comp2025_Site.xlsx"
 FETCH_JSON = "fetch.json"
+CA_DIR = "config/certs"  # Russian Trusted Root CA + Sub CA (публичные сертификаты, gu-st.ru)
 
 
 @dataclass(frozen=True)
@@ -40,9 +44,21 @@ class Target:
     url: str
 
 
+_CTX: ssl.SSLContext | None = None
+
+
+def ssl_context(ca_dir: str | Path = CA_DIR) -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    for pem in sorted(Path(ca_dir).glob("*.pem")):
+        ctx.load_verify_locations(cafile=str(pem))
+    return ctx
+
+
 def _get(url: str, timeout: int = 120) -> bytes:
+    global _CTX
+    _CTX = _CTX or ssl_context()
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=_CTX) as r:
         return r.read()
 
 

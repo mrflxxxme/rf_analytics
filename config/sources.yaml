@@ -97,6 +97,10 @@ rosstat_migration:
   fetch_from: actions
   notes: Матрицы «регион → регион» в листах бюллетеня не найдено — только прибытие/выбытие/сальдо по субъекту.
 
+# TLS rosstat.gov.ru и showdata — НУЦ Минцифры: config/certs/russian_trusted_{root,sub}_ca.pem
+# (https://gu-st.ru/content/lending/russian_trusted_*_ca_pem.crt; root SHA-256 D2:6D:2D:02:…:CA:8E:CF:31,
+# Sub CA действителен до 06.03.2027 — заменить при перевыпуске).
+
 rosstat_income:
   name: Росстат — среднедушевые денежные доходы населения по субъектам
   page: https://rosstat.gov.ru/folder/13397

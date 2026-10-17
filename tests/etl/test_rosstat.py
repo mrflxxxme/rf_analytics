@@ -235,6 +235,12 @@ def test_discover_links() -> None:
     assert fetch.discover_income("") is None
 
 
+def test_ssl_context_loads_russian_ca() -> None:
+    ctx = fetch.ssl_context(ROOT / fetch.CA_DIR)
+    names = {dict(x[0] for x in c["subject"]).get("commonName") for c in ctx.get_ca_certs()}
+    assert {"Russian Trusted Root CA", "Russian Trusted Sub CA"} <= names
+
+
 def test_fetch_rejects_html_instead_of_xlsx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fetch, "_get", lambda url, timeout=120: b"<html>blocked</html>")
     with pytest.raises(ValueError, match="не xlsx"):
