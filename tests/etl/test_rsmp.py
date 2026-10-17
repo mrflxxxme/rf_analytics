@@ -95,6 +95,24 @@ def test_marts(slim: Path, tmp_path: Path):
     assert len(rep["missing_regions"]) == 86  # есть 77, 50 и 59 (из старого кода 81)
 
 
+def test_parse_tolerates_bad_dates(tmp_path: Path):
+    docs = [_doc(f"77{i:02d}", "77", "56.10", "10.08.2016", "10.10.2025") for i in range(4)]
+    docs[1] = docs[1].replace('ДатаВклМСП="10.08.2016"', 'ДатаВклМСП="31.02.2016"')
+    st = parse.parse_zip(_zip(tmp_path / "bad.zip", docs), tmp_path / "bad.parquet", dt.date(2025, 10, 10))
+    assert st.docs_parsed == 4 and st.bad_dates == 1
+    incl = duckdb.sql(f"SELECT date_incl FROM '{tmp_path}/bad.parquet' WHERE inn='7701'").fetchone()
+    assert incl == (None,)  # строка осталась, битое поле пустое
+    assert not parse.is_complete(st)  # 1 из 4 — выше допуска 0,1%
+    st.docs_declared = st.docs_parsed = 10_000
+    assert parse.is_complete(st)
+
+
+def test_marts_duckdb_memory_limit(tmp_path: Path):
+    con = marts.connect(tmp_path)
+    limit = con.execute("SELECT current_setting('memory_limit')").fetchone()[0]
+    assert limit.endswith("GiB") and float(limit.split()[0]) <= 3
+
+
 def test_check_download_rejects_stub(tmp_path: Path):
     ok = _zip(tmp_path / "ok.zip", [_doc("7701", "77", "56.10", "10.08.2016", "10.10.2025")] * 2)
     cli._check_download(ok, ok.stat().st_size)
