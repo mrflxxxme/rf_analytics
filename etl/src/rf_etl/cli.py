@@ -1,4 +1,4 @@
-"""CLI ETL: `rf-etl rsmp-versions | rsmp-parse | rsmp-marts | manifest`."""
+"""CLI ETL: `rf-etl rsmp-versions | rsmp-parse | rsmp-marts | rosstat-fetch | region-profile | manifest`."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ import zipfile
 from pathlib import Path
 
 from rf_etl import manifest
+from rf_etl.rosstat import fetch as rosstat_fetch
+from rf_etl.rosstat import profile
 from rf_etl.rsmp import marts, parse, versions
 
 
@@ -105,6 +107,19 @@ def cmd_marts(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rosstat_fetch(a: argparse.Namespace) -> int:
+    log = rosstat_fetch.fetch(a.out_dir)
+    print(json.dumps(log, ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_region_profile(a: argparse.Namespace) -> int:
+    asof = dt.date.fromisoformat(a.asof) if a.asof else None
+    rep = profile.build(a.raw_dir, a.regions, a.out_dir, asof)
+    print(json.dumps({k: v for k, v in rep.items() if k != "sources"}, ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_manifest(a: argparse.Namespace) -> int:
     sid = a.snapshot or manifest.snapshot_id(dt.datetime.now(dt.UTC).date(), a.git_sha)
     m = manifest.build(a.marts_dir, sid, a.git_sha, a.taxonomy, a.slim_dir, a.raw_dir)
@@ -129,6 +144,15 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--taxonomy", default="config/taxonomy.yaml")
     m.add_argument("--regions", default="config/geo/regions.csv")
     m.set_defaults(fn=cmd_marts)
+    rf = sub.add_parser("rosstat-fetch", help="файлы Росстата для region_profile")
+    rf.add_argument("--out-dir", required=True)
+    rf.set_defaults(fn=cmd_rosstat_fetch)
+    rp = sub.add_parser("region-profile", help="витрина region_profile из файлов rosstat-fetch")
+    rp.add_argument("--raw-dir", required=True)
+    rp.add_argument("--out-dir", required=True)
+    rp.add_argument("--regions", default="config/geo/regions.csv")
+    rp.add_argument("--asof", help="дата для флагов устаревания, YYYY-MM-DD (по умолчанию сегодня UTC)")
+    rp.set_defaults(fn=cmd_region_profile)
     mf = sub.add_parser("manifest", help="manifest.json снимка; печатает snapshot id")
     mf.add_argument("--marts-dir", required=True)
     mf.add_argument("--git-sha", required=True)

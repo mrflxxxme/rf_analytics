@@ -73,9 +73,14 @@ hh:
 
 rosstat:
   name: Росстат — численность населения
+  # region_profile (T1.8): численность на 1 января 2016–2022 по полу и возрасту, пересчёт после ВПН-2020,
+  # листы М+Ж_Г+С (всё) и М+Ж_Г (город); оценка на 1 января и компоненты за год — OkPopul (имя ищем на странице).
   pages: [https://rosstat.gov.ru/compendium/document/13282, https://rosstat.gov.ru/compendium/document/13284]
   files:
     population_mo: https://rosstat.gov.ru/storage/mediabank/BUL_MO_{YYYY}.xlsx
+    population_by_age: https://rosstat.gov.ru/storage/mediabank/Chisl_polvozr_01-01-{YYYY}_VPN-2020.xlsx
+    population_components: https://rosstat.gov.ru/storage/mediabank/OkPopul_Comp{YYYY}_Site.xlsx
+  index_page: https://rosstat.gov.ru/folder/12781
   format: xlsx (старые годы — zip); HEAD отдаёт 405, только GET
   frequency: yearly
   license: открытые данные Росстата
@@ -91,3 +96,25 @@ rosstat_migration:
   license: открытые данные Росстата
   fetch_from: actions
   notes: Матрицы «регион → регион» в листах бюллетеня не найдено — только прибытие/выбытие/сальдо по субъекту.
+
+rosstat_income:
+  name: Росстат — среднедушевые денежные доходы населения по субъектам
+  page: https://rosstat.gov.ru/folder/13397
+  files:
+    by_subject: https://rosstat.gov.ru/storage/mediabank/urov_10subg_{выпуск}.xlsx
+  format: xlsx, лист СДД_субъекты; строки — названия субъектов, колонки — кварталы и «год» с 2011
+  frequency: quarterly; имя файла меняется с выпуском — ищем ссылку на странице раздела
+  license: открытые данные Росстата
+  fetch_from: actions
+
+rosstat_showdata:
+  name: Росстат — витрина showdata (доля городского населения, коэффициент миграционного прироста)
+  url: https://showdata.rosstat.gov.ru/x/report/{id}/view/compound/
+  reports:
+    "278932": доля городского населения на 1 января, %, 2019–2025
+    "279008": коэффициент миграционного прироста на 10 000 чел., 2017–2023
+  format: JSON отчёта (строки — ОКАТО, колонки — периоды); период отчёта фиксирован, фильтры GET игнорируются
+  frequency: yearly; новый период = новый отчёт (видно по флагам устаревания region_profile)
+  license: открытые данные Росстата
+  fetch_from: actions
+  notes: Ячейки db_conflict (несколько значений) пропускаются; численность в среднем за год (278930) — вся в конфликтах, не берём.
