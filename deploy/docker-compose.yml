@@ -1,0 +1,19 @@
+# Стек RADAR на 194.87.187.207 (docs/01-architecture.md, «Деплой на сервер»).
+# Каталог /opt/rf-analytics, порты не публикуются, вход только через edge-caddy по сети edge.
+name: rf-analytics
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    container_name: rf-analytics-caddy
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./static:/srv/static:ro
+    networks: [edge]
+    cpus: 0.25
+    mem_limit: 64m
+
+networks:
+  edge:
+    external: true

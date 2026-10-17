@@ -1,0 +1,13 @@
+# Внутренний Caddy RADAR: статика. TLS и домен — на edge-caddy.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	encode zstd gzip
+	# До T2.5 всё приложение noindex (D27); страницы фактов получат индексацию отдельным правилом.
+	header X-Robots-Tag "noindex, nofollow"
+	root * /srv/static
+	file_server
+}
