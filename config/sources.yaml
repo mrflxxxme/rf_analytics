@@ -1,0 +1,93 @@
+# Реестр источников (AGENTS.md: новый источник — только через этот файл).
+# fetch_from: где качаем — actions (GitHub Actions) | server (194.87.187.207, РФ-IP).
+# Доступность проверена пробником T1.1 (scripts/probe_sources.py), отчёт: docs/08-source-probe.md.
+
+fns_rsmp:
+  name: ФНС, Единый реестр субъектов МСП (открытые данные)
+  passport: https://www.nalog.gov.ru/opendata/7707329152-rsmp/
+  url_pattern: https://file.nalog.ru/opendata/7707329152-rsmp/data-{DDMMYYYY}-structure-{DDMMYYYY}.zip
+  version_list: HTML-таблица паспорта (ссылки data-*-structure-*.zip); meta.csv — только метаданные
+  schema: https://file.nalog.ru/opendata/7707329152-rsmp/structure-12052026.xsd
+  format: ZIP с XML-документами по XSD; один снимок на 10-е число месяца
+  size: ~2.1 ГБ ZIP на снимок (10.2026 — 2 246 598 554 Б)
+  history: с 08.2016, ~120 месячных снимков
+  frequency: monthly
+  license: Типовые условия использования общедоступной информации ФНС (https://www.nalog.gov.ru/files/tipovye_usloviya_od.pdf)
+  fetch_from: actions
+  notes: >-
+    Снимок — состав реестра на дату; даты и причины исключения в данных нет,
+    исключение = ИНН пропал в следующем снимке. Структура (version в имени) меняется — парсер по XSD версии.
+
+emiss:
+  name: ЕМИСС (fedstat.ru)
+  url: https://www.fedstat.ru/indicator/{id}
+  export: двухшаговый — GET страницы показателя (фильтры, токен) → POST /indicator/data.do?format=sdmx|excel
+  format: SDMX XML / Excel
+  frequency: месяц / квартал / год (по показателю)
+  license: открытые данные Росстата
+  fetch_from: server
+  notes: 403 с зарубежных IP (NL, Actions); качаем только с сервера.
+
+cbr:
+  name: Банк России, региональная банковская статистика
+  index: https://www.cbr.ru/statistics/bank_sector/sors/
+  files:
+    loans_ind: https://www.cbr.ru/vfs/statistics/BankSector/Loans_to_individuals/01_22_Loans_ind_{YYYYMMDD}.xlsx
+    deposits_ind: https://www.cbr.ru/vfs/statistics/BankSector/Borrowings/02_06_Dep_ind.xlsx
+    sme_debt_by_subject: https://www.cbr.ru/vfs/statistics/BankSector/Loans_to_corporations/01_13_F_Debt_sme_subj.xlsx
+    sme_borrowers: https://www.cbr.ru/vfs/statistics/banksector/loans_to_corporations/02_02_SME_Borrowers_info.xlsx
+  format: xlsx, десятки–сотни КБ
+  frequency: monthly
+  license: открытые данные Банка России
+  fetch_from: actions
+
+sberindex:
+  name: СберИндекс
+  url: https://sberindex.ru/
+  format: SPA; статические релизы /api/files/download/{uuid} (PDF); архив хакатона (муниципальные траты по категориям, 2023–2024)
+  archive: https://www.sberbank.com/common/img/uploaded/files/pdf/sberindex/hackathonlicence.zip
+  frequency: релизы еженедельно/ежемесячно; архив разовый
+  license: своя лицензия в архиве хакатона (прочитать до использования)
+  fetch_from: actions
+  notes: >-
+    Документированного CSV/JSON API по регионам × категориям не найдено; api.sberindex.ru рвёт TLS.
+    Слой «спрос» в T3.4 — решение D34.
+
+osm:
+  name: OpenStreetMap, выгрузки Geofabrik
+  url: https://download.geofabrik.de/russia-latest.osm.pbf
+  by_district: https://download.geofabrik.de/russia/{district}-fed-district-latest.osm.pbf
+  format: PBF; РФ целиком ~4.2 ГБ, ФО 39–840 МБ
+  frequency: daily
+  license: ODbL 1.0
+  fetch_from: actions
+
+hh:
+  name: hh.ru API
+  url: https://api.hh.ru/
+  format: JSON
+  access: справочники (/areas) открыты; /vacancies — 403 без токена зарегистрированного приложения
+  license: соглашение разработчика hh.ru (https://hh.ru/admin/developer_agreement)
+  fetch_from: actions
+  notes: Нужна регистрация приложения на dev.hh.ru (делает автор) до T3.4.
+
+rosstat:
+  name: Росстат — численность населения
+  pages: [https://rosstat.gov.ru/compendium/document/13282, https://rosstat.gov.ru/compendium/document/13284]
+  files:
+    population_mo: https://rosstat.gov.ru/storage/mediabank/BUL_MO_{YYYY}.xlsx
+  format: xlsx (старые годы — zip); HEAD отдаёт 405, только GET
+  frequency: yearly
+  license: открытые данные Росстата
+  fetch_from: actions
+
+rosstat_migration:
+  name: Росстат — бюллетень «Численность и миграция населения РФ»
+  page: https://rosstat.gov.ru/compendium/document/13283
+  files:
+    bulletin: https://rosstat.gov.ru/storage/mediabank/Bul_migr_{YYYY}.xlsx
+  format: xlsx ~1.2 МБ, ~60 листов
+  frequency: yearly, лаг ~1 год
+  license: открытые данные Росстата
+  fetch_from: actions
+  notes: Матрицы «регион → регион» в листах бюллетеня не найдено — только прибытие/выбытие/сальдо по субъекту.
