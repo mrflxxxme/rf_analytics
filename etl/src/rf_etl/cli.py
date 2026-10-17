@@ -1,8 +1,9 @@
-"""CLI ETL: `rf-etl rsmp-versions | rsmp-parse | rsmp-marts`."""
+"""CLI ETL: `rf-etl rsmp-versions | rsmp-parse | rsmp-marts | manifest`."""
 
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import http.client
 import json
 import shutil
@@ -12,6 +13,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from rf_etl import manifest
 from rf_etl.rsmp import marts, parse, versions
 
 
@@ -89,6 +91,14 @@ def cmd_marts(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_manifest(a: argparse.Namespace) -> int:
+    sid = a.snapshot or manifest.snapshot_id(dt.datetime.now(dt.UTC).date(), a.git_sha)
+    m = manifest.build(a.marts_dir, sid, a.git_sha, a.taxonomy, a.slim_dir, a.raw_dir)
+    print(sid)
+    print(f"{len(m['files'])} files, data_date={m['data_date']}", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rf-etl")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -105,6 +115,14 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--taxonomy", default="config/taxonomy.yaml")
     m.add_argument("--regions", default="config/geo/regions.csv")
     m.set_defaults(fn=cmd_marts)
+    mf = sub.add_parser("manifest", help="manifest.json снимка; печатает snapshot id")
+    mf.add_argument("--marts-dir", required=True)
+    mf.add_argument("--git-sha", required=True)
+    mf.add_argument("--snapshot", help="по умолчанию YYYY-MM-<sha7> от текущей даты UTC")
+    mf.add_argument("--slim-dir")
+    mf.add_argument("--raw-dir")
+    mf.add_argument("--taxonomy", default="config/taxonomy.yaml")
+    mf.set_defaults(fn=cmd_manifest)
     a = ap.parse_args(argv)
     return a.fn(a)
 

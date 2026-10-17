@@ -1,0 +1,11 @@
+{
+  "_comment": "Источники только для сервера (fetch_from: server в config/sources.yaml). every_days — период обновления.",
+  "sources": [
+    {
+      "id": "emiss_probe",
+      "url": "https://www.fedstat.ru/",
+      "filename": "index.html",
+      "every_days": 7
+    }
+  ]
+}

@@ -14,6 +14,24 @@ services:
     cpus: 0.25
     mem_limit: 64m
 
+  # Ночной скачиватель гео-блокируемых источников (D17). Только сеть и диск, в edge не входит.
+  # Ручной проход: docker compose -p rf-analytics run --rm fetcher python -u /app/fetch.py --once
+  fetcher:
+    image: python:3.12.7-alpine
+    container_name: rf-analytics-fetcher
+    restart: unless-stopped
+    command: ["python", "-u", "/app/fetch.py"]
+    environment:
+      RF_FETCH_AT: "00:30"
+    volumes:
+      - ./fetcher:/app:ro
+      - ./raw:/raw
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 0.5
+    mem_limit: 256m
+
 networks:
   edge:
     external: true

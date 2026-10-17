@@ -37,6 +37,10 @@
   `manifest.json` (версии источников, хеши, версия методологии, метрики бэктеста).
 - На сервере `marts/current` — симлинк на активный snapshot. Переключение
   атомарное, откат — смена симлинка. Хранятся последние 6 снимков.
+- Реализация (T1.4): `.github/workflows/monthly-etl.yml` (14-го числа и вручную,
+  `workflow_dispatch`) → `rf-etl manifest` → rsync в `marts/.incoming/<snapshot>` →
+  `deploy/publish-snapshot.sh` на сервере. Стек выкладывает `deploy-stack.yml`
+  при изменении `deploy/**` в `main`.
 - В интерфейсе всегда виден snapshot и дата данных. Ссылка на состояние экрана
   содержит snapshot, поэтому отчёт воспроизводим.
 
@@ -65,7 +69,9 @@ Query-spec — единственный способ получить данны
 - каталог `/opt/rf-analytics`, свой compose-проект `rf-analytics`;
 - контейнеры `rf-analytics-caddy` (статика + `reverse_proxy /api/* api:8000`) и
   `rf-analytics-api`, **порты не публикуются**, оба в сети `edge`;
-- `fetcher` — отдельный сервис с `cpus: 0.5`, `mem_limit: 256m`, запуск ночью;
+- `fetcher` — отдельный сервис с `cpus: 0.5`, `mem_limit: 256m`, запуск ночью
+  (00:30 UTC); список источников — `deploy/fetcher/sources.json`, результат —
+  `raw/<source>/<дата>/` + `fetch.json`;
 - лимиты: api `mem_limit: 512m`, `cpus: 1.0` (на сервере 2 ядра и ~3 ГБ свободно,
   он общий ещё с 9 сайтами);
 - в `/opt/edge-caddy/Caddyfile` дописывается один блок

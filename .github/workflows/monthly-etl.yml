@@ -1,14 +1,21 @@
-name: rsmp-etl
+name: monthly-etl
 
-# Реестр МСП ФНС → компактные снимки → витрины фактов (D15, D25, D27, D34).
-# Тесты — на каждый PR. Тяжёлый прогон — вручную или по метке PR `run-etl`.
-# Витрины пока публикуются артефактом; rsync на сервер — после T1.3/T1.4.
+# Ежемесячный ETL (docs/01-architecture.md, D17, D34): реестр МСП ФНС → компактные снимки →
+# витрины фактов → manifest.json → rsync на сервер в /opt/rf-analytics/marts/<snapshot> + current.
+# Тесты — на каждый PR. Тяжёлый прогон — по расписанию, вручную или по метке PR `run-etl`
+# (с PR витрины на сервер не публикуются).
 on:
+  schedule:
+    - cron: "0 3 14 * *"  # снимок реестра выходит 10-го; 14-го 06:00 МСК
   workflow_dispatch:
     inputs:
       spec:
         description: "annual | latest | YYYY-MM,YYYY-MM"
         default: annual
+      publish:
+        description: "Опубликовать snapshot на сервер"
+        type: boolean
+        default: true
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths:
@@ -16,7 +23,9 @@ on:
       - tests/etl/**
       - config/taxonomy.yaml
       - config/geo/regions.csv
-      - .github/workflows/rsmp-etl.yml
+      - deploy/publish-snapshot.sh
+      - deploy/fetcher/**
+      - .github/workflows/monthly-etl.yml
 
 permissions:
   contents: read
@@ -24,7 +33,7 @@ permissions:
 # opened + labeled на один коммит дают два запуска — тяжёлая матрица идёт один раз.
 # Посторонняя метка получает свою группу и ничего не отменяет; dispatch с другим spec — тоже.
 concurrency:
-  group: rsmp-etl-${{ github.ref }}-${{ inputs.spec || 'pr' }}${{ github.event.action == 'labeled' && github.event.label.name != 'run-etl' && format('-{0}', github.run_id) || '' }}
+  group: monthly-etl-${{ github.ref }}-${{ inputs.spec || github.event_name }}${{ github.event.action == 'labeled' && github.event.label.name != 'run-etl' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
@@ -44,7 +53,7 @@ jobs:
   plan:
     needs: test
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name != 'pull_request' ||
       (contains(github.event.pull_request.labels.*.name, 'run-etl') &&
        (github.event.action != 'labeled' || github.event.label.name == 'run-etl'))
     runs-on: ubuntu-latest
@@ -102,7 +111,7 @@ jobs:
       - name: Summary
         run: |
           {
-            echo '### rsmp-etl'; echo '```json'; cat marts/report.json; echo '```'
+            echo '### monthly-etl'; echo '```json'; cat marts/report.json; echo '```'
             echo '#### parse stats'; echo '```'; cat slim/*.stats.json; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
@@ -113,3 +122,49 @@ jobs:
             marts/
             slim/*.stats.json
           retention-days: 90
+
+  publish:
+    needs: marts
+    if: >-
+      needs.marts.result == 'success' &&
+      (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-latest
+    concurrency: publish-marts  # два прогона не переключают current одновременно
+    env:
+      SERVER: root@194.87.187.207
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: marts
+          path: art
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host 194.87.187.207\n  IdentityFile ~/.ssh/id_deploy\n  BatchMode yes\n  ConnectTimeout 30\n' > ~/.ssh/config
+      - name: rsync raw с сервера (то, что скачал fetcher)
+        run: rsync -a --exclude '*.part' "$SERVER:/opt/rf-analytics/raw/" raw/
+      - name: manifest.json
+        id: m
+        run: |
+          sid=$(uv run --project etl rf-etl manifest --marts-dir art/marts --slim-dir art/slim \
+                --raw-dir raw --git-sha "$GITHUB_SHA")
+          echo "snapshot=$sid" >> "$GITHUB_OUTPUT"
+      - name: rsync витрин и переключение current
+        env:
+          SNAP: ${{ steps.m.outputs.snapshot }}
+        run: |
+          ssh "$SERVER" "install -d -m 755 /opt/rf-analytics/marts/.incoming"
+          rsync -a --delete art/marts/ "$SERVER:/opt/rf-analytics/marts/.incoming/$SNAP/"
+          ssh "$SERVER" "SNAP=$SNAP bash -s" < deploy/publish-snapshot.sh | tee publish.log
+          {
+            echo "### snapshot \`$SNAP\`"; echo '```'; cat publish.log; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
