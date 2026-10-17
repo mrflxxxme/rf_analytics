@@ -1,8 +1,8 @@
 name: monthly-etl
 
 # Ежемесячный ETL (docs/01-architecture.md, D17, D34): реестр МСП ФНС → компактные снимки →
-# витрины фактов → manifest.json → rsync на сервер в /opt/rf-analytics/marts/<snapshot> + current.
-# Тесты — на каждый PR. Тяжёлый прогон — по расписанию, вручную или по метке PR `run-etl`
+# витрины фактов; Росстат → region_profile (T1.8) → manifest.json → rsync на сервер в /opt/rf-analytics/marts/<snapshot> + current.
+# Тесты и region_profile (лёгкий, ~2 МБ скачивания) — на каждый PR. Тяжёлый прогон МСП — по расписанию, вручную или по метке PR `run-etl`
 # (с PR витрины на сервер не публикуются).
 on:
   schedule:
@@ -23,6 +23,8 @@ on:
       - tests/etl/**
       - config/taxonomy.yaml
       - config/geo/regions.csv
+      - config/sources.yaml
+      - config/certs/**
       - deploy/publish-snapshot.sh
       - deploy/fetcher/**
       - .github/workflows/monthly-etl.yml
@@ -49,6 +51,29 @@ jobs:
           python-version: "3.12"
       - run: uv sync --project etl --frozen
       - run: uv run --project etl pytest -q tests/etl
+
+  profile:
+    # Росстат открыт с зарубежных IP (docs/08-source-probe.md) — качаем прямо в Actions.
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv run --project etl rf-etl rosstat-fetch --out-dir raw/rosstat > /dev/null
+      - run: uv run --project etl rf-etl region-profile --raw-dir raw/rosstat --out-dir marts | tee profile.json
+      - name: Summary
+        run: |
+          {
+            echo '### region_profile'; echo '```json'; cat profile.json; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: region-profile
+          path: marts/
+          retention-days: 90
 
   plan:
     needs: test
@@ -124,9 +149,9 @@ jobs:
           retention-days: 90
 
   publish:
-    needs: marts
+    needs: [marts, profile]
     if: >-
-      needs.marts.result == 'success' &&
+      needs.marts.result == 'success' && needs.profile.result == 'success' &&
       (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish))
     runs-on: ubuntu-latest
     concurrency: publish-marts  # два прогона не переключают current одновременно
@@ -141,6 +166,10 @@ jobs:
         with:
           name: marts
           path: art
+      - uses: actions/download-artifact@v4
+        with:
+          name: region-profile
+          path: art/marts
       - name: SSH
         env:
           SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}

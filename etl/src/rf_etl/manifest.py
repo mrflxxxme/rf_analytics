@@ -15,7 +15,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import yaml
 
-METHODOLOGY_VERSION = "0.1.0"  # 03-methodology.md: только измеренные факты (п. 11)
+METHODOLOGY_VERSION = "0.2.0"  # 03-methodology.md: только измеренные факты (п. 11, 12)
 SNAPSHOT_ID = re.compile(r"^\d{4}-\d{2}-[0-9a-f]{7}$")
 MANIFEST = "manifest.json"
 
@@ -64,6 +64,12 @@ def _raw_sources(raw_dir: Path | None) -> list[dict[str, object]]:
     return [json.loads(p.read_text("utf-8")) for p in sorted(raw_dir.glob("*/*/fetch.json"))]
 
 
+def _rosstat_sources(marts_dir: Path) -> list[dict[str, object]]:
+    """Файлы Росстата, из которых собран region_profile (их fetch.json попадает в отчёт витрины)."""
+    rep = marts_dir / "region_profile_report.json"
+    return json.loads(rep.read_text("utf-8")).get("sources", []) if rep.exists() else []
+
+
 def build(marts_dir: str | Path, sid: str, git_sha: str, taxonomy_path: str | Path,
           slim_dir: str | Path | None = None, raw_dir: str | Path | None = None,
           now: dt.datetime | None = None) -> dict[str, object]:
@@ -83,7 +89,7 @@ def build(marts_dir: str | Path, sid: str, git_sha: str, taxonomy_path: str | Pa
         "methodology_version": METHODOLOGY_VERSION,
         "taxonomy_version": str(tax.get("version")),
         "data_date": data_date,
-        "sources": {"fns_rsmp": rsmp, "server_raw": _raw_sources(Path(raw_dir) if raw_dir else None)},
+        "sources": {"fns_rsmp": rsmp, "rosstat": _rosstat_sources(marts), "server_raw": _raw_sources(Path(raw_dir) if raw_dir else None)},
         "backtest": None,  # после T3.5
         "files": files,
     }
