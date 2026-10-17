@@ -1,0 +1,53 @@
+name: deploy-stack
+
+# Выкладка compose-проекта rf-analytics на 194.87.187.207 (docs/01-architecture.md, «Деплой на сервер»).
+# Копирует только файлы стека в /opt/rf-analytics и делает `docker compose up -d` своего проекта.
+# edge-caddy и чужие стеки не трогает; статика (web) и витрины публикуются своими workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/**
+      - .github/workflows/deploy-stack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-stack
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SERVER: root@194.87.187.207
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host 194.87.187.207\n  IdentityFile ~/.ssh/id_deploy\n  BatchMode yes\n  ConnectTimeout 30\n' > ~/.ssh/config
+      - name: rsync файлов стека
+        id: sync
+        run: |
+          # Caddyfile смонтирован файлом: --inplace сохраняет inode (rename дал бы контейнеру старый файл).
+          out=$(rsync -ai --inplace --checksum deploy/Caddyfile "$SERVER:/opt/rf-analytics/Caddyfile")
+          echo "$out"
+          echo "caddy_changed=$([ -n "$out" ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+          rsync -ai --checksum deploy/docker-compose.yml "$SERVER:/opt/rf-analytics/docker-compose.yml"
+          rsync -ai --checksum --delete deploy/fetcher/ "$SERVER:/opt/rf-analytics/fetcher/"
+      - name: compose up
+        run: |
+          ssh "$SERVER" "CADDY_CHANGED=${{ steps.sync.outputs.caddy_changed }} bash -s" < deploy/stack-up.sh
+      - name: Проверка сайта
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://nishemer.194.87.187.207.sslip.io/)
+          echo "nishemer → $code"
+          test "$code" = 200
