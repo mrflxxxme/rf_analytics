@@ -28,19 +28,33 @@ def _check_download(dst: Path, expected: int) -> None:
         raise OSError(f"не ZIP ({size} байт): {head!r}")
 
 
-def _download(url: str, dst: Path, retries: int = 5) -> None:
+def _download(url: str, dst: Path, retries: int = 8) -> None:
+    """Обрыв под конец 2-ГБ архива — обычное дело для file.nalog.ru: докачиваем Range-запросом,
+    а не начинаем заново. Если сервер Range не поддержал (200 вместо 206) — пишем с нуля."""
+    expected = 0
+    dst.unlink(missing_ok=True)
     for attempt in range(1, retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": versions.UA})
-            with urllib.request.urlopen(req, timeout=120) as r, open(dst, "wb") as f:
-                expected = int(r.headers.get("Content-Length") or 0)
-                shutil.copyfileobj(r, f, length=8 << 20)
+            have = dst.stat().st_size if dst.exists() else 0
+            headers = {"User-Agent": versions.UA}
+            if have and expected:
+                headers["Range"] = f"bytes={have}-"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=120) as r:
+                resumed = r.status == 206
+                if not resumed:
+                    expected = int(r.headers.get("Content-Length") or 0)
+                with open(dst, "ab" if resumed else "wb") as f:
+                    shutil.copyfileobj(r, f, length=8 << 20)
             _check_download(dst, expected)
             print(f"downloaded {dst.stat().st_size} bytes", file=sys.stderr)
             return
         except (OSError, http.client.HTTPException) as e:
             print(f"download attempt {attempt} failed: {e}", file=sys.stderr)
-            time.sleep(60 * attempt)
+            # Докачивать есть смысл только недокачанный файл; заглушку или переросток — заново.
+            if not expected or (dst.exists() and dst.stat().st_size >= expected):
+                dst.unlink(missing_ok=True)
+            time.sleep(30 * attempt)
     raise RuntimeError(f"не скачали {url}")
 
 

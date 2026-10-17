@@ -113,6 +113,45 @@ def test_marts_duckdb_memory_limit(tmp_path: Path):
     assert limit.endswith("GiB") and float(limit.split()[0]) <= 3
 
 
+def test_download_resumes_with_range(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import http.server
+    import threading
+
+    body = _zip(tmp_path / "src.zip", [_doc(f"77{i:02d}", "77", "56.10", "10.08.2016", "10.10.2025")
+                                       for i in range(50)]).read_bytes()
+    ranges: list[str | None] = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            rng = self.headers.get("Range")
+            ranges.append(rng)
+            if rng:  # докачка: 206 с хвостом
+                start = int(rng.split("=")[1].rstrip("-"))
+                self.send_response(206)
+                self.send_header("Content-Length", str(len(body) - start))
+                self.end_headers()
+                self.wfile.write(body[start:])
+            else:  # первая отдача обрывается на середине
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body[: len(body) // 2])
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr(cli.time, "sleep", lambda s: None)
+    dst = tmp_path / "got.zip"
+    try:
+        cli._download(f"http://127.0.0.1:{srv.server_port}/x.zip", dst)
+    finally:
+        srv.shutdown()
+    assert dst.read_bytes() == body
+    assert ranges[0] is None and ranges[1] == f"bytes={len(body) // 2}-"
+
+
 def test_check_download_rejects_stub(tmp_path: Path):
     ok = _zip(tmp_path / "ok.zip", [_doc("7701", "77", "56.10", "10.08.2016", "10.10.2025")] * 2)
     cli._check_download(ok, ok.stat().st_size)
