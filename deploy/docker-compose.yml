@@ -13,6 +13,12 @@ services:
     networks: [edge]
     cpus: 0.25
     mem_limit: 64m
+    # Харденинг как у edge-caddy: ФС только на чтение; NET_BIND_SERVICE оставлен —
+    # бинарь caddy несёт file capability, без неё exec падает.
+    read_only: true
+    tmpfs: [/tmp, /data, /config]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
 
   # Ночной скачиватель гео-блокируемых источников (D17). Только сеть и диск, в edge не входит.
   # Ручной проход: docker compose -p rf-analytics run --rm fetcher python -u /app/fetch.py --once
