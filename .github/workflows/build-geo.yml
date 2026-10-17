@@ -1,0 +1,60 @@
+﻿name: build-geo
+
+# T1.6: полигоны 89 субъектов из OSM (Geofabrik) → mapshaper → ≤2 МБ.
+# Результат — артефакт; в репозиторий config/geo/regions.geojson кладётся отдельным коммитом.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/build_geo.py
+      - .github/workflows/build-geo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  geo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tools
+        run: sudo apt-get update -q && sudo apt-get install -yq osmium-tool
+      - name: Download extracts (Geofabrik, ODbL)
+        run: |
+          mkdir -p work
+          for u in russia-latest.osm.pbf europe/ukraine-latest.osm.pbf; do
+            curl -fsSL --retry 3 -A "rf-analytics-geo/0.1 (+https://github.com/mrflxxxme/rf_analytics)" \
+              -o "work/$(basename $u)" "https://download.geofabrik.de/$u"
+          done
+          ls -la work
+      - name: Boundaries → GeoJSONSeq
+        run: |
+          for f in russia ukraine; do
+            osmium tags-filter "work/$f-latest.osm.pbf" r/admin_level=4 -o "work/$f-b.pbf" --overwrite
+            osmium export "work/$f-b.pbf" -f geojsonseq --geometry-types=polygon \
+              --attributes=type,id -o "work/$f.geojsonseq" --overwrite
+          done
+      - name: Match 89 subjects
+        run: python scripts/build_geo.py config/geo/regions.csv work/russia.geojsonseq work/ukraine.geojsonseq -o work/regions_full.geojson --provenance work/geo-provenance.json
+      - name: Simplify to ≤2 MB
+        run: |
+          for pct in 6 4 3 2 1.5 1; do
+            npx -y mapshaper@0.6 work/regions_full.geojson -simplify "${pct}%" keep-shapes \
+              -clean -o work/regions.geojson precision=0.0001 force
+            size=$(stat -c%s work/regions.geojson)
+            echo "simplify ${pct}% -> ${size} bytes"
+            if [ "$size" -le 2000000 ]; then echo "$pct" > work/simplify.txt; break; fi
+          done
+          test -f work/simplify.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: geo
+          path: |
+            work/regions.geojson
+            work/geo-provenance.json
+            work/simplify.txt
