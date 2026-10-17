@@ -24,6 +24,7 @@ on:
       - config/taxonomy.yaml
       - config/geo/regions.csv
       - config/sources.yaml
+      - config/certs/**
       - deploy/publish-snapshot.sh
       - deploy/fetcher/**
       - .github/workflows/monthly-etl.yml

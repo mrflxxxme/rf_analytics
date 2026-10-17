@@ -1,7 +1,7 @@
 """Загрузка файлов Росстата для `region_profile` (config/sources.yaml: rosstat_*).
 
 rosstat.gov.ru и showdata.rosstat.gov.ru открыты с зарубежных IP — качаем в GitHub Actions.
-Их сертификаты выданы НУЦ Минцифры: цепочка (config/certs/*.pem) добавляется к системным корням
+Их сертификаты выданы НУЦ Минцифры: цепочка (config/certs/*.crt) добавляется к системным корням
 только в контексте этих запросов.
 Имена xlsx меняются с выпуском, поэтому ссылку на свежий файл ищем на странице раздела;
 если страница не ответила — берём последнее известное имя.
@@ -49,7 +49,7 @@ _CTX: ssl.SSLContext | None = None
 
 def ssl_context(ca_dir: str | Path = CA_DIR) -> ssl.SSLContext:
     ctx = ssl.create_default_context()
-    for pem in sorted(Path(ca_dir).glob("*.pem")):
+    for pem in sorted(Path(ca_dir).glob("*.crt")):
         ctx.load_verify_locations(cafile=str(pem))
     return ctx
 
