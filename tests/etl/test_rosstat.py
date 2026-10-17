@@ -239,6 +239,8 @@ def test_ssl_context_loads_russian_ca() -> None:
     ctx = fetch.ssl_context(ROOT / fetch.CA_DIR)
     names = {dict(x[0] for x in c["subject"]).get("commonName") for c in ctx.get_ca_certs()}
     assert {"Russian Trusted Root CA", "Russian Trusted Sub CA"} <= names
+    ours = [c for c in ctx.get_ca_certs() if "Russian Trusted" in str(c["subject"])]
+    assert any(c["notAfter"].endswith("2029 GMT") for c in ours)  # Sub CA 2024: им подписан *.rosstat.gov.ru
 
 
 def test_fetch_rejects_html_instead_of_xlsx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

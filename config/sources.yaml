@@ -97,9 +97,10 @@ rosstat_migration:
   fetch_from: actions
   notes: Матрицы «регион → регион» в листах бюллетеня не найдено — только прибытие/выбытие/сальдо по субъекту.
 
-# TLS rosstat.gov.ru и showdata — НУЦ Минцифры: config/certs/russian_trusted_{root,sub}_ca.crt
-# (https://gu-st.ru/content/lending/russian_trusted_*_ca_pem.crt; root SHA-256 D2:6D:2D:02:…:CA:8E:CF:31,
-# Sub CA действителен до 06.03.2027 — заменить при перевыпуске).
+# TLS rosstat.gov.ru и showdata — НУЦ Минцифры: config/certs/*.crt — Root CA и Sub CA
+# (https://gu-st.ru/content/lending/russian_trusted_*_ca_pem.crt; root SHA-256 D2:6D:2D:02:…:CA:8E:CF:31)
+# и Sub CA выпуска 2024, которым подписан *.rosstat.gov.ru (AIA http://nuc-cdp.voskhod.ru/cdp/subca_ssl_rsa2024.crt,
+# SHA-256 21:55:78:50:…:7D:88:A3:F2, до 19.07.2029). Сервер промежуточный сертификат не отдаёт.
 
 rosstat_income:
   name: Росстат — среднедушевые денежные доходы населения по субъектам
