@@ -128,6 +128,15 @@ def cmd_manifest(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_facts(a: argparse.Namespace) -> int:
+    from rf_etl.facts import render
+
+    today = dt.date.fromisoformat(a.today) if a.today else None
+    rep = render.build(a.marts_dir, a.config_dir, a.out_dir, a.site_url, a.methodology, today)
+    print(json.dumps(rep, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="rf-etl")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -161,6 +170,14 @@ def main(argv: list[str] | None = None) -> int:
     mf.add_argument("--raw-dir")
     mf.add_argument("--taxonomy", default="config/taxonomy.yaml")
     mf.set_defaults(fn=cmd_manifest)
+    fc = sub.add_parser("facts", help="статические страницы фактов, sitemap.xml, robots.txt (T2.5)")
+    fc.add_argument("--marts-dir", required=True, help="каталог snapshot (marts/current)")
+    fc.add_argument("--out-dir", required=True)
+    fc.add_argument("--site-url", required=True, help="канонический адрес сайта, https://…")
+    fc.add_argument("--config-dir", default="config")
+    fc.add_argument("--methodology", default="docs/03-methodology.md")
+    fc.add_argument("--today", help="дата для «Региона недели», YYYY-MM-DD (по умолчанию сегодня UTC)")
+    fc.set_defaults(fn=cmd_facts)
     a = ap.parse_args(argv)
     return a.fn(a)
 

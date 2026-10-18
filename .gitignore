@@ -33,3 +33,7 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# локальное состояние плагинов агентов
+.omc/
+.claude/
