@@ -8,6 +8,10 @@ on:
     branches: [main]
     paths:
       - deploy/**
+      - api/**
+      - config/metrics.yaml
+      - config/taxonomy.yaml
+      - config/geo/**
       - .github/workflows/deploy-stack.yml
   workflow_dispatch:
 
@@ -34,6 +38,20 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf 'Host 194.87.187.207\n  IdentityFile ~/.ssh/id_deploy\n  BatchMode yes\n  ConnectTimeout 30\n' > ~/.ssh/config
+      - name: Образ api (сборка здесь, на сервер — docker load; реестра нет)
+        run: |
+          # Тег — хеш исходников api и вшитого конфига: тот же код второй раз не собирается и не везётся.
+          tag=$(git ls-files -s api config/metrics.yaml config/taxonomy.yaml config/geo/regions.csv \
+                config/geo/regions.geojson | sha256sum | cut -c1-12)
+          echo "rf-analytics-api:$tag"
+          if ssh "$SERVER" "docker image inspect rf-analytics-api:$tag > /dev/null 2>&1"; then
+            echo "образ уже на сервере"
+          else
+            docker build -f api/Dockerfile -t "rf-analytics-api:$tag" .
+            docker save "rf-analytics-api:$tag" | gzip -1 | ssh "$SERVER" "gunzip | docker load"
+          fi
+          ssh "$SERVER" "docker tag rf-analytics-api:$tag rf-analytics-api:current"
+          echo "API_TAG=$tag" >> "$GITHUB_ENV"
       - name: rsync файлов стека
         id: sync
         run: |
@@ -45,9 +63,21 @@ jobs:
           rsync -ai --checksum --delete deploy/fetcher/ "$SERVER:/opt/rf-analytics/fetcher/"
       - name: compose up
         run: |
-          ssh "$SERVER" "CADDY_CHANGED=${{ steps.sync.outputs.caddy_changed }} bash -s" < deploy/stack-up.sh
+          ssh "$SERVER" "CADDY_CHANGED=${{ steps.sync.outputs.caddy_changed }} API_TAG=$API_TAG bash -s" < deploy/stack-up.sh
       - name: Проверка сайта
         run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://nishemer.194.87.187.207.sslip.io/)
+          site=https://nishemer.194.87.187.207.sslip.io
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$site/")
           echo "nishemer → $code"
           test "$code" = 200
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$site/api/health") && [ "$code" = 200 ] && break
+            sleep 3
+          done
+          echo "api/health → $code"
+          test "$code" = 200
+          curl -s -D - "$site/api/meta" | tee meta.txt
+          grep -qi '^x-robots-tag: noindex' meta.txt
+          {
+            echo '### /api/meta'; echo '```'; cat meta.txt; echo; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

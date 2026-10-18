@@ -1,0 +1,108 @@
+# Семантический слой RADAR (docs/01-architecture.md, «API»; T2.1).
+#
+# Белый список метрик и измерений для query-spec (POST /api/query). Всё, чего здесь
+# нет, API отклоняет. Выражения `expr` пишет только автор в этом файле — из запроса
+# в SQL попадают лишь значения фильтров, и только параметрами.
+#
+# mart       — витрина snapshot (`<mart>.parquet` в marts/current)
+# expr       — агрегат над строками витрины (DuckDB SQL); для долей и логарифмов
+#              считается из сумм компонентов, а не усреднением готовых значений
+# grain      — измерения витрины; `period` — время (`time`), остальные — колонки
+# defaults   — значение измерения, если запрос его не группирует и не фильтрует
+#              (need_id = _all: все субъекты региона, иначе сумма задвоится)
+# rollup     — можно ли агрегировать по региону; false — запрос обязан
+#              группировать по region_id или фильтровать один регион
+# where      — постоянный фильтр витрины (для long-таблицы region_profile)
+# kind       — measured: только измеренные факты (D27, 03-methodology.md, п. 11–12)
+
+version: 0.1.0
+
+dimensions:
+  region_id: {label: Субъект РФ, ref: regions}
+  need_id: {label: Потребность, ref: needs}
+  period: {label: Период}
+
+metrics:
+  msp_active:
+    label: Активные субъекты МСП
+    unit: субъектов
+    kind: measured
+    source: fns_rsmp
+    mart: msp_active
+    time: {column: snapshot_date, type: date}
+    grain: [region_id, need_id, period]
+    defaults: {need_id: _all}
+    expr: sum(active)
+    rollup: true
+
+  msp_growth_12m:
+    label: Чистый прирост субъектов МСП за 12 месяцев
+    unit: ln(t / t−12 мес.)
+    kind: measured
+    source: fns_rsmp
+    mart: msp_growth_12m
+    time: {column: snapshot_date, type: date}
+    grain: [region_id, need_id, period]
+    defaults: {need_id: _all}
+    expr: ln(sum(active)::DOUBLE / sum(active_prev_12m))
+    rollup: true
+
+  msp_survival_12m:
+    label: Доля новых субъектов МСП, работающих через 12 месяцев
+    unit: доля
+    kind: measured
+    source: fns_rsmp
+    mart: msp_survival_12m
+    time: {column: cohort_date, type: date}
+    grain: [region_id, need_id, period]
+    defaults: {need_id: _all}
+    expr: sum(survived_n)::DOUBLE / sum(cohort_n)
+    rollup: true
+
+  population:
+    label: Численность постоянного населения на 1 января
+    unit: чел.
+    kind: measured
+    source: rosstat
+    mart: region_profile
+    where: {indicator: population}
+    time: {column: year, type: year}
+    grain: [region_id, period]
+    expr: sum(value)
+    rollup: true
+
+  urban_share:
+    label: Доля городского населения на 1 января
+    unit: "%"
+    kind: measured
+    source: rosstat
+    mart: region_profile
+    where: {indicator: urban_share}
+    time: {column: year, type: year}
+    grain: [region_id, period]
+    expr: any_value(value)
+    rollup: false
+
+  migration_rate:
+    label: Коэффициент миграционного прироста за год
+    unit: на 10 000 чел.
+    kind: measured
+    source: rosstat
+    mart: region_profile
+    where: {indicator: migration_rate}
+    time: {column: year, type: year}
+    grain: [region_id, period]
+    expr: any_value(value)
+    rollup: false
+
+  income_per_capita:
+    label: Среднедушевые денежные доходы населения за год
+    unit: руб./мес.
+    kind: measured
+    source: rosstat
+    mart: region_profile
+    where: {indicator: income_per_capita}
+    time: {column: year, type: year}
+    grain: [region_id, period]
+    expr: any_value(value)
+    rollup: false
