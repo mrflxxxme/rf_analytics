@@ -2,11 +2,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api";
 import { MapView } from "./MapView";
-import { Footer, Legend, Timeline, TopList } from "./Panels";
+import { Footer, Hero, Legend, Timeline, TopList } from "./Panels";
 import {
-  METRICS, buildSeries, fixAntimeridian, formatPeriod, formatValue, makeScale, parseState, stateToSearch,
-  topN, valuesAt, type MetricId, type Series, type ViewState,
+  METRICS, THEMES, buildSeries, fixAntimeridian, formatValue, makeScale, parseState, parseTheme, stateToSearch,
+  topN, valuesAt, withTheme, type MetricId, type Series, type ViewState,
 } from "./model";
+
+// Вариант T2.4 (?theme=tablo|magma|led) — на всё время жизни страницы.
+const THEME = parseTheme(window.location.search);
+document.documentElement.dataset.theme = THEME;
 
 interface Refs {
   meta: api.Meta;
@@ -57,7 +61,7 @@ export function App() {
 
   const update = useCallback((patch: Partial<ViewState>) => setView((v) => ({ ...v, ...patch })), []);
   useEffect(() => {
-    window.history.replaceState(null, "", stateToSearch(view));
+    window.history.replaceState(null, "", withTheme(stateToSearch(view), THEME));
   }, [view]);
 
   const need = view.need ?? (refs?.needs.find((n) => n.id === "restaurants_cafes") ?? refs?.needs[0])?.id ?? null;
@@ -74,7 +78,7 @@ export function App() {
 
   const periods = mapS.series.periods;
   const t = view.t && periods.includes(view.t) ? view.t : periods[periods.length - 1] ?? null;
-  const scale = useMemo(() => makeScale(mapS.series, METRICS[metric].diverging), [mapS.series, metric]);
+  const scale = useMemo(() => makeScale(mapS.series, METRICS[metric].diverging, THEMES[THEME]), [mapS.series, metric]);
   const mapVals = useMemo(() => (t ? valuesAt(mapS.series, t) : new Map<string, number>()), [mapS.series, t]);
   const fill = useCallback((id: string) => scale.color(mapVals.get(id)), [scale, mapVals]);
 
@@ -129,6 +133,7 @@ export function App() {
         <div className="mapwrap">
           <MapView
             geo={refs.geo}
+            palette={THEMES[THEME]}
             fill={fill}
             fillKey={`${metric}|${need}|${view.mode}|${t}`}
             selected={view.region}
@@ -144,7 +149,12 @@ export function App() {
           {(mapS.loading || listS.loading) && <div className="loading">обновляю…</div>}
           {error && <div className="err">{error}</div>}
           <Legend scale={scale} metric={metric} unitNote={UNIT_NOTE[metric]} />
-          <div className="when">{t ? formatPeriod(t) : ""}</div>
+          <Hero
+            title={view.mode === "niche" ? needName.get(need ?? "") ?? "—" : regionName ?? "Выберите регион"}
+            t={t}
+            leader={items[0] ?? null}
+            metric={metric}
+          />
         </div>
         <TopList
           title={title}

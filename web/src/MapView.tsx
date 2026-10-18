@@ -6,12 +6,13 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import { GeoJsonLayer } from "@deck.gl/layers";
 import type { Feature, Geometry } from "geojson";
 import type { Geo, RegionProps } from "./api";
-import type { RGB } from "./model";
+import type { Palette, RGB } from "./model";
 
 type F = Feature<Geometry, RegionProps>;
 
 interface Props {
   geo: Geo;
+  palette: Palette;
   fill: (regionId: string) => RGB | null;
   fillKey: string; // меняется — deck.gl пересчитывает цвета (с переходом)
   selected: string | null;
@@ -20,9 +21,8 @@ interface Props {
 }
 
 const BOUNDS: [number, number, number, number] = [19, 41, 191, 78];
-const NO_DATA: [number, number, number, number] = [52, 58, 68, 255];
 
-export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Props) {
+export function MapView({ geo, palette, fill, fillKey, selected, onHover, onClick }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const overlay = useRef<MapboxOverlay | null>(null);
   const handlers = useRef({ onHover, onClick });
@@ -32,7 +32,7 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
     if (!box.current) return;
     const map = new maplibregl.Map({
       container: box.current,
-      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#0e1116" } }] },
+      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": palette.bg } }] },
       bounds: BOUNDS,
       fitBoundsOptions: { padding: 12 },
       renderWorldCopies: false,
@@ -63,7 +63,7 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
       overlay.current = null;
       map.remove();
     };
-  }, []);
+  }, []); // тема (?theme=) читается при загрузке и не меняется — фон карты задаём один раз
 
   useEffect(() => {
     overlay.current?.setProps({
@@ -76,9 +76,9 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
           filled: true,
           getFillColor: (f: F) => {
             const c = fill(f.properties.region_id);
-            return c ? [c[0], c[1], c[2], 255] : NO_DATA;
+            return [...(c ?? palette.noData), 255];
           },
-          getLineColor: (f: F) => (f.properties.region_id === selected ? [255, 255, 255, 255] : [14, 17, 22, 255]),
+          getLineColor: (f: F) => (f.properties.region_id === selected ? [255, 255, 255, 255] : [...palette.border, 255]),
           getLineWidth: (f: F) => (f.properties.region_id === selected ? 2.5 : 0.6),
           lineWidthUnits: "pixels",
           autoHighlight: true,
@@ -96,7 +96,7 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
         }),
       ],
     });
-  }, [geo, fill, fillKey, selected]);
+  }, [geo, palette, fill, fillKey, selected]);
 
   return <div ref={box} className="map" role="application" aria-label="Карта субъектов РФ" />;
 }

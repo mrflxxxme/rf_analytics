@@ -1,4 +1,5 @@
-/* Нейтральная тёмная тема до выбора направления T2.4: все цвета — токены здесь. */
+/* Все цвета — токены здесь; шкалы заливки — в model.ts (THEMES).
+   Варианты T2.4 переключаются ?theme= (атрибут data-theme на <html>); по умолчанию — «Табло». */
 :root {
   --bg: #0e1116;
   --panel: #151a21;
@@ -7,9 +8,28 @@
   --muted: #8b94a3;
   --accent: #f0e246;
   --err: #ff8a7a;
-  --seq: linear-gradient(90deg, #1d2a4e, #21668c, #209e88, #7cc854, #f0e246);
-  --div: linear-gradient(90deg, #d6604d, #f4a582, #3c424e, #92c5de, #4393c3);
+  --legend-bg: rgba(21, 26, 33, .9);
   color-scheme: dark;
+}
+/* Б «Магма»: тёплый чёрный, оранжевый акцент, заголовок-ниша антиквой. */
+:root[data-theme="magma"] {
+  --bg: #120d0b;
+  --panel: #1c1512;
+  --line: #352a23;
+  --fg: #f4ebe3;
+  --muted: #a8978b;
+  --accent: #ffa45c;
+  --legend-bg: rgba(28, 21, 18, .9);
+}
+/* В «Лёд»: графит, один холодный оттенок, сводка чипами. */
+:root[data-theme="led"] {
+  --bg: #0a0d10;
+  --panel: #11171c;
+  --line: #1f2b34;
+  --fg: #dce8ef;
+  --muted: #7d8f9c;
+  --accent: #6edcf5;
+  --legend-bg: rgba(17, 23, 28, .9);
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -30,12 +50,24 @@ button, select, input { font: inherit; color: inherit; }
 
 .body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 0; }
 .mapwrap { position: relative; min-height: 0; }
-.map { position: absolute; inset: 0; }
+.map { position: absolute; inset: 0; z-index: 0; } /* свой контекст наложения: WebGL-холсты не перекрывают hero и легенду */
 .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; z-index: 2; max-width: 240px; }
 .loading { position: absolute; top: 8px; left: 8px; font-size: 12px; color: var(--muted); }
 .err { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--panel); color: var(--err); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; z-index: 3; max-width: 90%; }
-.when { position: absolute; top: 8px; left: 12px; font-size: 28px; font-weight: 700; opacity: .85; pointer-events: none; font-variant-numeric: tabular-nums; }
-.legend { position: absolute; left: 12px; bottom: 12px; width: 220px; background: rgba(21, 26, 33, .9); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+/* Hero поверх карты. А «Табло»: крупная дата, ниша мелко. */
+.hero { position: absolute; z-index: 1; top: 8px; left: 12px; max-width: calc(100% - 64px); pointer-events: none; font-variant-numeric: tabular-nums; }
+.hero-when { font-size: 28px; font-weight: 700; opacity: .85; }
+.hero-title { font-size: 13px; color: var(--muted); }
+.hero-lead { display: none; }
+/* Б: ниша — заголовком, дата — надстрочником, лидер — подписью. */
+[data-theme="magma"] .hero-when { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); opacity: 1; }
+[data-theme="magma"] .hero-title { font-family: Georgia, "Times New Roman", serif; font-size: 30px; line-height: 1.1; color: var(--fg); max-width: 520px; text-shadow: 0 1px 12px var(--bg); }
+[data-theme="magma"] .hero-lead { display: block; font-size: 13px; margin-top: 4px; }
+/* В: всё — в ряд чипов. */
+[data-theme="led"] .hero { display: flex; flex-wrap: wrap; gap: 6px; }
+[data-theme="led"] .hero > div { display: block; background: var(--legend-bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; opacity: 1; font-weight: 400; color: var(--fg); }
+[data-theme="led"] .hero-when { color: var(--accent) !important; font-weight: 600 !important; }
+.legend { position: absolute; left: 12px; bottom: 12px; width: 220px; background: var(--legend-bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 .ramp { height: 8px; border-radius: 4px; }
 .ends { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; font-variant-numeric: tabular-nums; }
 
@@ -60,7 +92,7 @@ button, select, input { font: inherit; color: inherit; }
 .eco a:hover { color: var(--fg); }
 .eco .cur { color: var(--fg); }
 .fatal { padding: 24px; }
-.maplibregl-ctrl-attrib { background: rgba(14, 17, 22, .7) !important; color: var(--muted); }
+.maplibregl-ctrl-attrib { background: var(--legend-bg) !important; color: var(--muted); }
 .maplibregl-ctrl-attrib a { color: var(--muted); }
 
 /* Телефон: карта сверху, топ-10 — нижний лист (docs/04-ux.md). */
@@ -70,7 +102,10 @@ button, select, input { font: inherit; color: inherit; }
   .mapwrap { height: 58dvh; }
   .top { border-left: 0; border-top: 1px solid var(--line); }
   .timeline { position: sticky; bottom: 0; background: var(--bg); z-index: 4; }
-  .when { font-size: 20px; }
+  .hero-when { font-size: 20px; }
+  [data-theme="magma"] .hero-title { font-size: 20px; }
+  [data-theme="magma"] .hero-lead { font-size: 12px; }
+  [data-theme="led"] .hero > div { font-size: 12px; padding: 2px 8px; }
   .legend { width: 150px; padding: 6px; }
   .legend .small { display: none; }
   .hdr select { flex: 1 1 100%; width: 100%; }

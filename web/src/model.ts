@@ -80,9 +80,53 @@ export function topN(values: Map<string, number>, n = 10): [string, number][] {
 
 export type RGB = [number, number, number];
 
-// Последовательная (тёмная тема: от тёмно-синего к жёлтому) и расходящаяся шкалы.
-const SEQ: RGB[] = [[29, 42, 78], [33, 102, 140], [32, 158, 136], [124, 200, 84], [240, 226, 70]];
-const DIV: RGB[] = [[214, 96, 77], [244, 165, 130], [60, 66, 78], [146, 197, 222], [67, 147, 195]];
+/** Варианты hero-экрана T2.4 (?theme=): CSS-токены — в styles.css, шкалы и цвета карты — здесь. */
+export type ThemeId = "tablo" | "magma" | "led";
+
+export interface Palette {
+  name: string;
+  seq: RGB[]; // последовательная шкала, от малого к большому
+  div: RGB[]; // расходящаяся: падение → 0 → рост
+  bg: string; // фон карты (= --bg)
+  noData: RGB;
+  border: RGB; // границы регионов
+}
+
+export const THEMES: Record<ThemeId, Palette> = {
+  // А: нейтральная тема T2.2 — сине-зелёно-жёлтая шкала, крупная дата на карте.
+  tablo: {
+    name: "Табло",
+    seq: [[29, 42, 78], [33, 102, 140], [32, 158, 136], [124, 200, 84], [240, 226, 70]],
+    div: [[214, 96, 77], [244, 165, 130], [60, 66, 78], [146, 197, 222], [67, 147, 195]],
+    bg: "#0e1116", noData: [52, 58, 68], border: [14, 17, 22],
+  },
+  // Б: тёплый чёрный, шкала «магма», заголовок-ниша как у издания.
+  magma: {
+    name: "Магма",
+    seq: [[40, 17, 66], [114, 31, 129], [183, 55, 121], [241, 96, 93], [254, 176, 120], [252, 253, 191]],
+    div: [[94, 60, 153], [178, 171, 210], [58, 50, 46], [253, 184, 99], [230, 97, 1]],
+    bg: "#120d0b", noData: [58, 50, 46], border: [18, 13, 11],
+  },
+  // В: графит и один оттенок (лёд), сводка-чипы вместо крупной даты.
+  led: {
+    name: "Лёд",
+    seq: [[22, 38, 52], [27, 74, 99], [36, 120, 150], [86, 180, 206], [200, 240, 250]],
+    div: [[255, 122, 89], [140, 82, 70], [44, 50, 58], [44, 112, 140], [110, 220, 245]],
+    bg: "#0a0d10", noData: [40, 46, 54], border: [10, 13, 16],
+  },
+};
+
+const isTheme = (v: string | null): v is ThemeId => v !== null && v in THEMES;
+
+/** Тема — параметр предпросмотра, не часть состояния экрана: по умолчанию «Табло». */
+export function parseTheme(search: string): ThemeId {
+  const v = new URLSearchParams(search).get("theme");
+  return isTheme(v) ? v : "tablo";
+}
+
+export function withTheme(search: string, theme: ThemeId): string {
+  return theme === "tablo" ? search : `${search}&theme=${theme}`;
+}
 
 function ramp(stops: RGB[], x: number): RGB {
   const c = Math.min(1, Math.max(0, x)) * (stops.length - 1);
@@ -98,17 +142,20 @@ export interface Scale {
   min: number;
   max: number;
   diverging: boolean;
+  stops: RGB[]; // для легенды
 }
 
 /** Домен по всем периодам ряда: при проигрывании видно рост, а не перекраску под каждый год. */
-export function makeScale(s: Series, diverging: boolean): Scale {
+export function makeScale(s: Series, diverging: boolean, pal: Palette = THEMES.tablo): Scale {
+  const SEQ = pal.seq;
+  const DIV = pal.div;
   const all: number[] = [];
   for (const m of s.byKey.values()) for (const v of m.values()) all.push(v);
   if (diverging) {
     const abs = all.map(Math.abs).sort((a, b) => a - b);
     const lim = abs.length ? abs[Math.floor((abs.length - 1) * 0.95)]! || 1e-9 : 1;
     return {
-      min: -lim, max: lim, diverging,
+      min: -lim, max: lim, diverging, stops: DIV,
       color: (v) => (v === undefined ? null : ramp(DIV, (v / lim + 1) / 2)),
     };
   }
@@ -117,7 +164,7 @@ export function makeScale(s: Series, diverging: boolean): Scale {
   const hi = pos.length ? Math.max(...pos) : 1;
   const span = Math.log(hi) - Math.log(lo) || 1;
   return {
-    min: lo, max: hi, diverging,
+    min: lo, max: hi, diverging, stops: SEQ,
     color: (v) => (v === undefined ? null : ramp(SEQ, v > 0 ? (Math.log(v) - Math.log(lo)) / span : 0)),
   };
 }

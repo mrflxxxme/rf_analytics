@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Geo, Row } from "./api";
-import { buildSeries, fixAntimeridian, formatValue, makeScale, parseState, stateToSearch, topN, valuesAt } from "./model";
+import {
+  THEMES, buildSeries, fixAntimeridian, formatValue, makeScale, parseState, parseTheme, stateToSearch, topN, valuesAt,
+  withTheme,
+} from "./model";
 
 const rows: Row[] = [
   { metric: "msp_active", region_id: "77", period: "2017-10-10", value: 100 },
@@ -47,6 +50,24 @@ describe("шкала", () => {
       { metric: "g", region_id: "2", period: "p", value: 0.1 }], "region_id"), true);
     expect(sc.min).toBe(-sc.max);
     expect(sc.color(0)).toEqual([60, 66, 78]);
+  });
+});
+
+describe("темы T2.4", () => {
+  it("?theme= разбирается, мусор → «Табло», параметр переживает перезапись URL", () => {
+    expect(parseTheme("?mode=niche&theme=magma")).toBe("magma");
+    expect(parseTheme("?theme=x")).toBe("tablo");
+    expect(withTheme("?mode=niche", "led")).toBe("?mode=niche&theme=led");
+    expect(withTheme("?mode=niche", "tablo")).toBe("?mode=niche");
+  });
+  it("у каждой темы концы шкалы — её собственные", () => {
+    const s = buildSeries(rows, "region_id");
+    for (const pal of Object.values(THEMES)) {
+      const sc = makeScale(s, false, pal);
+      expect(sc.color(50)).toEqual(pal.seq[0]);
+      expect(sc.color(200)).toEqual(pal.seq[pal.seq.length - 1]);
+      expect(sc.stops).toBe(pal.seq);
+    }
   });
 });
 

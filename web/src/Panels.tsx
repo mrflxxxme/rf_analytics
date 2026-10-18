@@ -1,4 +1,4 @@
-// Топ-10, шкала времени, легенда, подвал (D28).
+// Топ-10, шкала времени, hero, легенда, подвал (D28).
 import { useEffect, useRef, useState } from "react";
 import eco from "../../config/ecosystem.json";
 import { formatPeriod, formatValue, type MetricId, type Scale } from "./model";
@@ -86,9 +86,31 @@ export function Timeline(props: { periods: string[]; t: string | null; onChange:
   );
 }
 
+/** Hero-блок поверх карты (T2.4): одна разметка, вид задаёт тема — дата-табло, заголовок или чипы. */
+export function Hero(props: {
+  title: string;
+  t: string | null;
+  leader: { label: string; value: number } | null;
+  metric: MetricId;
+}) {
+  const { title, t, leader, metric } = props;
+  return (
+    <div className="hero">
+      <div className="hero-when">{t ? formatPeriod(t) : ""}</div>
+      <div className="hero-title">{title}</div>
+      {leader && (
+        <div className="hero-lead">
+          <span className="muted">больше всего — </span>
+          {leader.label} · {formatValue(metric, leader.value)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Legend(props: { scale: Scale; metric: MetricId; unitNote: string }) {
   const { scale, metric, unitNote } = props;
-  const stops = scale.diverging ? "var(--div)" : "var(--seq)";
+  const stops = `linear-gradient(90deg, ${scale.stops.map((c) => `rgb(${c.join(",")})`).join(", ")})`;
   return (
     <div className="legend" aria-label="Легенда">
       <div className="ramp" style={{ background: stops }} />
