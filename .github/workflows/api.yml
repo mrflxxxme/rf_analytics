@@ -1,0 +1,55 @@
+name: api
+
+# Тесты API (T2.1: валидация query-spec, отказ на метрику вне списка) и сборка образа.
+on:
+  pull_request:
+    paths:
+      - api/**
+      - tests/api/**
+      - config/metrics.yaml
+      - config/taxonomy.yaml
+      - config/geo/**
+      - deploy/**
+      - .github/workflows/api.yml
+  push:
+    branches: [main]
+    paths:
+      - api/**
+      - tests/api/**
+      - config/metrics.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --project api --frozen
+      - run: uv run --project api pytest -q tests/api
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f api/Dockerfile -t rf-analytics-api:ci .
+      - name: Смоук как на сервере (read_only, без snapshot → 503 на /meta)
+        run: |
+          mkdir -p marts
+          docker run -d --name api --read-only --tmpfs /tmp --cap-drop ALL \
+            -v "$PWD/marts:/marts:ro" -p 8000:8000 rf-analytics-api:ci
+          for i in $(seq 1 20); do curl -fs localhost:8000/api/health && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/meta)" = 503
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/regions)" = 200
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' \
+                 -d '{"metrics":["revenue_forecast"]}' localhost:8000/api/query)
+          test "$code" = 422
+          docker logs api
+      - name: compose config
+        run: |
+          docker network create edge
+          docker compose -f deploy/docker-compose.yml config -q

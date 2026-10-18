@@ -12,3 +12,8 @@ if [[ "${CADDY_CHANGED:-0}" == "1" ]]; then
   docker compose -p rf-analytics -f docker-compose.yml restart caddy
 fi
 docker compose -p rf-analytics -f docker-compose.yml ps --format '{{.Name}} {{.Status}}'
+# Старые образы api (только свои теги): оставляем current и только что выложенный.
+if [[ -n "${API_TAG:-}" ]]; then
+  docker images rf-analytics-api --format '{{.Tag}}' | grep -vx -e current -e "$API_TAG" \
+    | sed 's/^/rf-analytics-api:/' | xargs -r docker rmi > /dev/null 2>&1 || true
+fi
