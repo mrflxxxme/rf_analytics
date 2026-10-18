@@ -1,0 +1,10 @@
+{
+  "_comment": "Полоса экосистемы в подвале (D28, Э-05, Э-16). url = null — домен ещё не зарегистрирован (Э-47): имя показывается без ссылки. Читают web/ и rf-etl facts.",
+  "author": {"label": "от Кирилла Уклонского", "url": "https://uklonskiyk.ru/?source=nishemer_footer"},
+  "products": [
+    {"id": "center", "label": "uklonskiyk.ru", "url": "https://uklonskiyk.ru/?source=nishemer_footer"},
+    {"id": "nishemer", "label": "Нишемер", "url": null, "current": true},
+    {"id": "scout", "label": "Скаут", "url": null},
+    {"id": "born_to_build", "label": "Born to Build", "url": null}
+  ]
+}

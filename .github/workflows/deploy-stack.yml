@@ -78,6 +78,17 @@ jobs:
           test "$code" = 200
           curl -s -D - "$site/api/meta" | tee meta.txt
           grep -qi '^x-robots-tag: noindex' meta.txt
+          # POST /api/query на боевом snapshot: срез по регионам и ряд ниши для шкалы времени карты (T2.2).
+          set -o pipefail
+          q() { curl -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d "$1" "$site/api/query"; }
+          q '{"metrics":["msp_active"],"group_by":["region_id"]}' > q1.txt
+          q '{"metrics":["msp_active"],"group_by":["region_id","period"],"filters":[{"dim":"need_id","values":["restaurants_cafes"]}]}' > q2.txt
+          for f in q1.txt q2.txt; do
+            test "$(tail -1 "$f")" = 200
+            head -n -1 "$f" | python3 -c 'import json,sys; b=json.load(sys.stdin); r=b["rows"]; p=sorted({x["period"] for x in r})
+          print(b["snapshot"], len(r), "строк, периоды", p[0], "…", p[-1], "×", len(p)); assert len({x["region_id"] for x in r}) >= 80' | tee -a qsum.txt
+          done
           {
             echo '### /api/meta'; echo '```'; cat meta.txt; echo; echo '```'
+            echo '### POST /api/query'; echo '```'; cat qsum.txt; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

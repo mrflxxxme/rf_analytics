@@ -1,0 +1,133 @@
+name: web
+
+# Статика сайта (T2.2, T2.5): приложение web/ → /karta/ и слой фактов из витрин current → /, /fakty/, sitemap.xml.
+# На PR — тесты, сборка и проверка заголовков Caddy. На main, после publish monthly-etl и по понедельникам
+# («Регион недели») — сборка фактов из marts/current сервера и rsync -a --delete в /opt/rf-analytics/static.
+on:
+  pull_request:
+    paths:
+      - web/**
+      - etl/src/rf_etl/facts/**
+      - tests/etl/test_facts.py
+      - config/ecosystem.json
+      - docs/03-methodology.md
+      - deploy/Caddyfile
+      - deploy/caddy-check.sh
+      - .github/workflows/web.yml
+  push:
+    branches: [main]
+    paths:
+      - web/**
+      - etl/src/rf_etl/facts/**
+      - config/ecosystem.json
+      - config/taxonomy.yaml
+      - config/geo/regions.csv
+      - docs/03-methodology.md
+      - .github/workflows/web.yml
+  workflow_run:
+    workflows: [monthly-etl]
+    types: [completed]
+  schedule:
+    - cron: "0 4 * * 1"  # понедельник 07:00 МСК — «Регион недели»
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # После monthly-etl — только успешный прогон с main (там и бывает publish).
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event != 'pull_request')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm test
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+          retention-days: 7
+
+  caddy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash deploy/caddy-check.sh
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    env:
+      SERVER: root@194.87.187.207
+      SITE_URL: ${{ vars.RF_SITE_URL || 'https://nishemer.ru' }}
+      PLACEHOLDER: https://nishemer.194.87.187.207.sslip.io
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host 194.87.187.207\n  IdentityFile ~/.ssh/id_deploy\n  BatchMode yes\n  ConnectTimeout 30\n' > ~/.ssh/config
+      - name: Витрины current с сервера (только чтение)
+        run: |
+          rsync -a --include=manifest.json --include='msp_*.parquet' --exclude='*' \
+            "$SERVER:/opt/rf-analytics/marts/current/" marts/
+          ls -la marts
+      - name: Страницы фактов
+        run: |
+          uv run --project etl rf-etl facts --marts-dir marts --out-dir site --site-url "$SITE_URL" | tee facts.json
+          cp -r dist site/karta
+          echo "$(find site -name index.html | wc -l) страниц, $(du -sh site | cut -f1)"
+      - name: rsync в /opt/rf-analytics/static
+        run: rsync -a --delete --checksum --chmod=Da+rx,Fa+r site/ "$SERVER:/opt/rf-analytics/static/"
+      - name: Проверка
+        run: |
+          set -o pipefail
+          for p in / /karta/ /sitemap.xml /robots.txt /metodologiya/ /fakty/nisha-mesyaca/; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$PLACEHOLDER$p"); echo "$p → $code"; test "$code" = 200
+          done
+          curl -s -D - -o /dev/null "$PLACEHOLDER/karta/" | grep -qi '^x-robots-tag: noindex'
+          # Свой домен ещё не в edge — индексацию проверяем внутри своего caddy с Host: nishemer.ru.
+          # Новый Caddyfile подхватывает deploy-stack (рестарт своего caddy) — ждём до ~3 минут.
+          ok=0
+          for _ in $(seq 18); do
+            ssh "$SERVER" "docker exec rf-analytics-caddy wget -S -q -O /dev/null --header 'Host: nishemer.ru' \
+              http://127.0.0.1:8080/fakty/nisha-mesyaca/" 2> hdr.txt || true
+            if grep -q ' 200 ' hdr.txt && ! grep -qi 'x-robots-tag' hdr.txt; then ok=1; break; fi
+            sleep 10
+          done
+          cat hdr.txt
+          test "$ok" = 1
+          {
+            echo '### web'; echo '```json'; cat facts.json; echo '```'
+            echo "Сайт: $PLACEHOLDER (noindex целиком), канон: $SITE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

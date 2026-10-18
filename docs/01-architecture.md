@@ -89,6 +89,16 @@ Query-spec — единственный способ получить данны
 - статика публикуется через `rsync -a --delete` **внутрь** существующего каталога
   (подмена каталога через `mv` ломает bind-монт).
 
+Раскладка статики (T2.2, T2.5; workflow `web.yml`): `/` (оглавление), `/fakty/nisha/<need_id>/`,
+`/fakty/region/<region_id>/`, `/fakty/nisha-mesyaca/`, `/fakty/region-nedeli/`, `/metodologiya/`,
+`sitemap.xml`, `robots.txt` — индексируемый слой фактов (D27), собирается `rf-etl facts` из
+`marts/current` сервера; `/karta/` — приложение `web/` (Vite, React, MapLibre + deck.gl).
+Пересборка: push в `main`, успешный `monthly-etl` (новый snapshot) и по понедельникам
+(«Регион недели» — ротация по номеру ISO-недели). Внутренний Caddy ставит
+`X-Robots-Tag: noindex` на всё, кроме путей фактов на своём домене; временный адрес
+`*.sslip.io` закрыт целиком, чтобы поиск не запомнил его до переезда (R14). Канонический
+адрес в страницах и sitemap — переменная репозитория `RF_SITE_URL` (по умолчанию `https://nishemer.ru`).
+
 DNS: A и AAAA для домена продукта → `194.87.187.207` / `2a03:6f00:a::2:da7f`.
 
 ## Секреты
