@@ -106,6 +106,21 @@ def test_every_internal_link_resolves(site: Path) -> None:
             assert href in pages, (p, href)
 
 
+def test_hero_map(site: Path) -> None:
+    """T2.4: на главной — SVG-карта субъектов; регион — ссылка на свою страницу фактов, импульсы — у растущих."""
+    doc = (site / "index.html").read_text("utf-8")
+    hero = doc[doc.index('<section class="hero">'):doc.index("</section>")]
+    svg = hero[hero.index("<svg"):hero.index("</svg>")]
+    assert 'role="img"' in svg and 'class="grat"' in svg
+    hrefs = set(re.findall(r'<a href="(/fakty/region/[^"]+/)"><path class="r\d"', svg))
+    assert hrefs == {"/fakty/region/77/", "/fakty/region/78/", "/fakty/region/01/"}
+    for h in hrefs:
+        assert (site / h.strip("/") / "index.html").is_file(), h
+    assert svg.count('class="pulse"') == 3  # у всех трёх регионов рост +10 %
+    assert svg.count('<path class="rn"') > 70  # прочие субъекты — «нет данных», без ссылок
+    assert all((site / "fonts" / f).is_file() for f in render.FONTS)
+
+
 def test_pct_format() -> None:
     assert render.pct(math.log(0.9)) == "−10,0 %"
     assert render.pct(None) == "нет данных"

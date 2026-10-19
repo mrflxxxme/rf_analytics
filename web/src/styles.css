@@ -1,19 +1,29 @@
-/* Нейтральная тёмная тема до выбора направления T2.4: все цвета — токены здесь. */
+/* Дизайн-система «прибор-радар», вариант A «Осциллограф» (T2.4, docs/04-ux.md): палитра экосистемы
+   uklonskiyk.ru на тёмном корпусе, сетка прибора, моно-подписи. Шкалы заливки — SEQ/DIV в model.ts (те же цвета). */
+@font-face { font-family: "Fira Sans Condensed"; font-weight: 800; font-display: swap;
+  src: url(/fonts/fira-cond-800-cyrillic.woff2) format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+2116; }
+@font-face { font-family: "Fira Sans Condensed"; font-weight: 800; font-display: swap;
+  src: url(/fonts/fira-cond-800-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
 :root {
-  --bg: #0e1116;
-  --panel: #151a21;
-  --line: #262d38;
-  --fg: #e6e8eb;
-  --muted: #8b94a3;
-  --accent: #f0e246;
-  --err: #ff8a7a;
-  --seq: linear-gradient(90deg, #1d2a4e, #21668c, #209e88, #7cc854, #f0e246);
-  --div: linear-gradient(90deg, #d6604d, #f4a582, #3c424e, #92c5de, #4393c3);
+  --bg: #100d0b;
+  --panel: #1c1815;
+  --line: #312b24;
+  --grid: rgba(245, 241, 232, .05);
+  --fg: #f5f1e8;
+  --fg2: #bcb6aa;
+  --muted: #8a8275;
+  --accent: #ff4a2b;
+  --accent2: #ff6a4d;
+  --err: #ff6a4d;
+  --seq: linear-gradient(90deg, #2c251f, #6e2c16, #c2401e, #ff5a3a, #ffbea0);
+  --div: linear-gradient(90deg, #566260, #363c3a, #2c251f, #c2401e, #ff5a3a);
+  --disp: "Fira Sans Condensed", "Segoe UI", system-ui, Arial, sans-serif;
+  --mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, "SF Mono", Menlo, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.4 -apple-system, "Segoe UI", system-ui, Roboto, sans-serif; }
 a { color: var(--fg); }
 button, select, input { font: inherit; color: inherit; }
 .muted { color: var(--muted); }
@@ -21,29 +31,32 @@ button, select, input { font: inherit; color: inherit; }
 
 .app { display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
 .hdr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
-.logo { font-weight: 700; text-decoration: none; margin-right: 4px; }
+.logo { font: 800 19px/1 var(--disp); text-decoration: none; margin-right: 4px; display: inline-flex; align-items: center; gap: 8px; }
+.logo::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--bg), 0 0 0 4.5px var(--accent); margin: 0 4px; }
 .modes { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .modes button { background: none; border: 0; padding: 6px 10px; cursor: pointer; }
-.modes button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+.modes button[aria-selected="true"] { background: var(--accent); color: #fff; }
 .hdr select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%; min-width: 0; }
-.beta { margin-left: auto; font-size: 12px; color: var(--accent); border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; }
+.beta { margin-left: auto; font: 11px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent2); border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; }
 
 .body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 0; }
-.mapwrap { position: relative; min-height: 0; }
+.mapwrap { position: relative; min-height: 0;
+  background: linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px, var(--bg); }
 .map { position: absolute; inset: 0; }
 .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; z-index: 2; max-width: 240px; }
 .loading { position: absolute; top: 8px; left: 8px; font-size: 12px; color: var(--muted); }
 .err { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--panel); color: var(--err); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; z-index: 3; max-width: 90%; }
-.when { position: absolute; top: 8px; left: 12px; font-size: 28px; font-weight: 700; opacity: .85; pointer-events: none; font-variant-numeric: tabular-nums; }
-.legend { position: absolute; left: 12px; bottom: 12px; width: 220px; background: rgba(21, 26, 33, .9); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-.ramp { height: 8px; border-radius: 4px; }
-.ends { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.when { position: absolute; top: 8px; left: 12px; font: 800 30px/1 var(--disp); color: var(--fg); opacity: .9; pointer-events: none; font-variant-numeric: tabular-nums; }
+.legend { position: absolute; left: 12px; bottom: 12px; width: 220px; background: rgba(16, 13, 11, .92); border: 1px solid var(--line); border-radius: 0; padding: 8px; }
+.ramp { height: 8px; border-radius: 0; outline: 1px solid var(--line); }
+.ends { display: flex; justify-content: space-between; font: 11px/1.4 var(--mono); color: var(--fg2); margin: 4px 0; font-variant-numeric: tabular-nums; }
 
 .top { border-left: 1px solid var(--line); padding: 12px; overflow: auto; }
-.top h2 { font-size: 15px; margin: 0 0 8px; }
+.top h2 { font: 11px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 4px 0 10px; }
+.top .val { font-family: var(--mono); color: var(--accent2); }
 .top ol { list-style: none; margin: 0; padding: 0; counter-reset: n; }
 .top li button { position: relative; display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 7px 6px 9px; cursor: pointer; counter-increment: n; }
-.top li button::before { content: counter(n); color: var(--muted); font-variant-numeric: tabular-nums; }
+.top li button::before { content: counter(n, decimal-leading-zero); color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .top li button:hover, .top li button.on { background: var(--panel); }
 .top .val { font-variant-numeric: tabular-nums; }
 .top .meter { position: absolute; left: 34px; bottom: 3px; height: 2px; background: var(--accent); opacity: .7; border-radius: 1px; }
@@ -51,16 +64,16 @@ button, select, input { font: inherit; color: inherit; }
 .timeline { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
 .timeline input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 0; }
 .play { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); cursor: pointer; flex: none; }
-.tl-edge { color: var(--muted); font-size: 12px; }
-.tl-cur { min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+.tl-edge { color: var(--muted); font: 11px/1.4 var(--mono); }
+.tl-cur { min-width: 70px; text-align: right; font-family: var(--mono); color: var(--accent2); font-variant-numeric: tabular-nums; }
 
-.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 8px 12px; border-top: 1px solid var(--line); font: 12px/1.5 var(--mono); }
 .eco { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
 .eco a { color: var(--muted); text-decoration: none; }
 .eco a:hover { color: var(--fg); }
 .eco .cur { color: var(--fg); }
 .fatal { padding: 24px; }
-.maplibregl-ctrl-attrib { background: rgba(14, 17, 22, .7) !important; color: var(--muted); }
+.maplibregl-ctrl-attrib { background: rgba(16, 13, 11, .7) !important; color: var(--muted); }
 .maplibregl-ctrl-attrib a { color: var(--muted); }
 
 /* Телефон: карта сверху, топ-10 — нижний лист (docs/04-ux.md). */
