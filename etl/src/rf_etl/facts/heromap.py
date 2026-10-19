@@ -106,10 +106,6 @@ def svg(geojson: str | Path, info: dict[str, tuple[str, float | None, str | None
     for lat in range(40, 90, 10):
         pts = [px(*_proj(lon, lat)) for lon in range(18, 192)]
         grat.append("M" + "L".join(f"{a} {b}" for a, b in pts))
-    cx, cy = W / 2, h * 0.62  # центр развёртки
-    rings = "".join(f'<circle cx="{cx:.0f}" cy="{cy:.0f}" r="{r}"/>' for r in (110, 220, 330, 440, 550))
-    sweep = (f'<g class="sweep" style="transform-origin:{cx:.0f}px {cy:.0f}px"><path d="M{cx:.0f} {cy:.0f}L{cx + 620:.0f} {cy:.0f}A620 620 0 0 0 '
-             f'{cx + 620 * math.cos(math.radians(-38)):.0f} {cy + 620 * math.sin(math.radians(-38)):.0f}z"/></g>')
     blips, placed = [], []  # подпись уходит влево/вниз, если рядом уже есть импульс
     for i, (rid, tag) in enumerate(pulses):
         if rid not in centers:
@@ -122,8 +118,5 @@ def svg(geojson: str | Path, info: dict[str, tuple[str, float | None, str | None
                      f'<circle class="ring" r="6"/><circle class="dot" r="3.5"/>'
                      f'<text x="{dx}" y="{dy}" text-anchor="{anchor}">{html.escape(tag)}</text></g>')
     return (f'<svg viewBox="0 0 {W} {h}" role="img" aria-label="{html.escape(label)}">'
-            f'<defs><clipPath id="hm-clip"><rect width="{W}" height="{h}"/></clipPath></defs>'
-            f'<g class="rng" clip-path="url(#hm-clip)" aria-hidden="true">{rings}'
-            f'<path d="M0 {cy:.0f}H{W}M{cx:.0f} 0V{h}"/>{sweep}</g>'
             f'<path class="grat" aria-hidden="true" d="{"".join(grat)}"/>'
             + "".join(out) + f'<g class="blips" aria-hidden="true">{"".join(blips)}</g></svg>')

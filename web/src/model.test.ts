@@ -38,15 +38,15 @@ describe("шкала", () => {
     const sc = makeScale(buildSeries(rows, "region_id"), false);
     expect(sc.min).toBe(50);
     expect(sc.max).toBe(200);
-    expect(sc.color(50)).toEqual([29, 42, 78]);
-    expect(sc.color(200)).toEqual([240, 226, 70]);
+    expect(sc.color(50)).toEqual([44, 37, 31]);
+    expect(sc.color(200)).toEqual([255, 190, 160]);
     expect(sc.color(undefined)).toBeNull();
   });
   it("расходящаяся — симметрична вокруг нуля", () => {
     const sc = makeScale(buildSeries([{ metric: "g", region_id: "1", period: "p", value: -0.2 },
       { metric: "g", region_id: "2", period: "p", value: 0.1 }], "region_id"), true);
     expect(sc.min).toBe(-sc.max);
-    expect(sc.color(0)).toEqual([60, 66, 78]);
+    expect(sc.color(0)).toEqual([44, 37, 31]);
   });
 });
 

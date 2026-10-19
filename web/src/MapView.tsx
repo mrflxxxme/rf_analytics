@@ -20,7 +20,10 @@ interface Props {
 }
 
 const BOUNDS: [number, number, number, number] = [19, 41, 191, 78];
-const NO_DATA: [number, number, number, number] = [52, 58, 68, 255];
+// Цвета «прибора-радара» (styles.css): «нет данных» — чуть светлее корпуса, границы — цвет корпуса.
+const NO_DATA: [number, number, number, number] = [28, 24, 21, 255];
+const EDGE: [number, number, number, number] = [16, 13, 11, 255];
+const INK: [number, number, number, number] = [245, 241, 232, 255];
 
 export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Props) {
   const box = useRef<HTMLDivElement>(null);
@@ -32,7 +35,7 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
     if (!box.current) return;
     const map = new maplibregl.Map({
       container: box.current,
-      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#0e1116" } }] },
+      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "rgba(0,0,0,0)" } }] }, // сетка прибора — фон .mapwrap
       bounds: BOUNDS,
       fitBoundsOptions: { padding: 12 },
       renderWorldCopies: false,
@@ -78,11 +81,11 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
             const c = fill(f.properties.region_id);
             return c ? [c[0], c[1], c[2], 255] : NO_DATA;
           },
-          getLineColor: (f: F) => (f.properties.region_id === selected ? [255, 255, 255, 255] : [14, 17, 22, 255]),
+          getLineColor: (f: F) => (f.properties.region_id === selected ? INK : EDGE),
           getLineWidth: (f: F) => (f.properties.region_id === selected ? 2.5 : 0.6),
           lineWidthUnits: "pixels",
           autoHighlight: true,
-          highlightColor: [255, 255, 255, 60],
+          highlightColor: [245, 241, 232, 60],
           transitions: { getFillColor: 450 },
           updateTriggers: { getFillColor: fillKey, getLineColor: selected, getLineWidth: selected },
           onHover: (info) => {

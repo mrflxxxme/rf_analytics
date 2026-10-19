@@ -1,7 +1,7 @@
 /* Нишемер, слой фактов. Дизайн-система «прибор-радар» (T2.4, docs/04-ux.md): палитра экосистемы
    uklonskiyk.ru (тёплые чёрный/крем, коралл), своя форма — градусная сетка, шкалы с делениями, моно-показания,
    импульсы в регионах роста. Шкала заливки --r0…--r5: спад — холодный, рост — накал коралла.
-   ВАРИАНТЫ (выбор владельца): по умолчанию A «Осциллограф»; html[data-v=b] «Самописец»; html[data-v=c] «Развёртка». */
+   Вариант A «Осциллограф» — выбор владельца 19.10.2026 (B «Самописец» и C «Развёртка» отклонены). */
 @font-face{font-family:"Fira Sans Condensed";font-style:normal;font-weight:800;font-display:swap;
   src:url(/fonts/fira-cond-800-cyrillic.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
 @font-face{font-family:"Fira Sans Condensed";font-style:normal;font-weight:800;font-display:swap;
@@ -92,14 +92,12 @@ footer .in{padding-top:40px;padding-bottom:40px}footer a{color:var(--d-ink2)}
 .hero-map path{stroke:var(--edge);stroke-width:.7;stroke-linejoin:round}
 .hero-map a:hover path,.hero-map a:focus path{stroke:var(--hero-ink);stroke-width:1.6}
 .hero-map .grat{fill:none;stroke:var(--grat);stroke-width:.8;stroke-dasharray:2 5;pointer-events:none}
-.hero-map .rng{display:none}
 .blips{pointer-events:none}
 .blips .dot{fill:var(--sig)}
 .blips .ring{fill:none;stroke:var(--sig);stroke-width:1.5;transform-box:fill-box;transform-origin:center;
   animation:ping 2.6s cubic-bezier(.2,.6,.3,1) infinite;animation-delay:calc(var(--i) * .5s)}
 .blips text{font:600 21px var(--mono);fill:var(--sig-t);paint-order:stroke;stroke:var(--scope-bg);stroke-width:4px;stroke-linejoin:round}
 @keyframes ping{0%{transform:scale(.6);opacity:1}80%,100%{transform:scale(4.2);opacity:0}}
-@keyframes sweep{to{transform:rotate(-360deg)}}
 .r0{fill:var(--r0);background:var(--r0)}.r1{fill:var(--r1);background:var(--r1)}.r2{fill:var(--r2);background:var(--r2)}
 .r3{fill:var(--r3);background:var(--r3)}.r4{fill:var(--r4);background:var(--r4)}.r5{fill:var(--r5);background:var(--r5)}
 .rn{fill:var(--rn);background:var(--rn)}
@@ -124,48 +122,13 @@ footer .in{padding-top:40px;padding-bottom:40px}footer a{color:var(--d-ink2)}
 .readout dt{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--hero-ink3)}
 .readout dd{margin:4px 0 0;font:800 26px/1 var(--disp);color:var(--hero-ink);font-variant-numeric:tabular-nums}
 
-@media (prefers-reduced-motion:reduce){.blips .ring,.sweep{animation:none!important}.blips .ring{opacity:.5;transform:scale(2)}}
-
-/* ── B «Самописец»: светлый лист регистратора — миллиметровка, чернила, коралловое перо ─────────── */
-[data-v=b]{--hero-bg:var(--void);--hero-ink:var(--ink);--hero-ink2:var(--ink-2);--hero-ink3:var(--ink-3);--hero-line:var(--line-2);
-  --scope-bg:#FAF8F3;--grid:rgba(140,132,116,.13);--grat:rgba(88,81,68,.35);--sig:#D9361A;--sig-t:var(--ink);--edge:#FAF8F3;
-  --r0:#6E7B78;--r1:#A9B2AE;--r2:#E2DACB;--r3:#F4B9A6;--r4:#F2765A;--r5:#D9361A;--rn:#EFEBE2}
-[data-v=b] .beta{background:var(--void-2);color:var(--ink-3);border-color:var(--line-2)}[data-v=b] .beta b{color:var(--coral-2)}
-[data-v=b] .hero{background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/8px 8px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/8px 8px,
-  linear-gradient(rgba(140,132,116,.22) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(140,132,116,.22) 1px,transparent 1px) 0 0/40px 40px,var(--void)}
-[data-v=b] .hero h1{color:var(--ink)}
-[data-v=b] .scope,[data-v=b] .readout{border:1.5px solid var(--ink)}
-[data-v=b] .scope-hd{border-color:var(--ink);background:var(--ink);color:var(--void)}[data-v=b] .scope-hd span:last-child{color:#FF8A70}
-[data-v=b] .scope-ft{border-color:var(--ink)}
-[data-v=b] .hero-map path{stroke-width:.6}
-[data-v=b] .blips text{stroke:#FAF8F3}
-[data-v=b] .readout dl{background:var(--ink);border-color:var(--ink)}
-
-/* ── C «Развёртка»: экран радара на всю ширину — кольца дальности, вращающийся луч, показания поверх ─ */
-[data-v=c]{--scope-bg:transparent;--grat:rgba(188,182,170,.14);--sig:#FF6A4D}
-[data-v=c] .hero{background:radial-gradient(60% 70% at 50% 62%,rgba(255,74,43,.07),transparent 70%),var(--d-bg3)}
-[data-v=c] .hero .in{max-width:1440px;grid-template-columns:minmax(0,4fr) minmax(0,9fr);grid-template-areas:"txt scope" "read read";gap:0 24px;padding-top:0}
-[data-v=c] .hero-txt{display:block;align-self:center;padding-top:40px}
-[data-v=c] .hero h1{font-size:clamp(38px,4.2vw,64px)}
-[data-v=c] .hero .lead{margin-top:16px}
-[data-v=c] .scope{border:0;padding-top:56px}[data-v=c] .scope::before,[data-v=c] .scope::after{display:none}
-[data-v=c] .scope-hd{position:absolute;top:16px;right:0;border:0;padding:0}
-[data-v=c] .scope-ft{border:0;justify-content:flex-end}
-[data-v=c] .hero-map .rng{display:inline;fill:none;stroke:rgba(255,106,77,.16);stroke-width:1}
-[data-v=c] .sweep path{fill:rgba(255,74,43,.06);stroke:rgba(255,106,77,.5);stroke-width:1.2}
-[data-v=c] .sweep{animation:sweep 9s linear infinite}
-[data-v=c] .readout{border:0;border-top:1px solid var(--d-line);background:none;display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 40px;padding:0}
-[data-v=c] .readout .eyebrow{grid-column:1/-1}
-[data-v=c] .readout ol{columns:2 220px;column-gap:28px}[data-v=c] .readout li{break-inside:avoid}
-[data-v=c] .readout dl div{background:var(--d-bg3)}
+@media (prefers-reduced-motion:reduce){.blips .ring{animation:none}.blips .ring{opacity:.5;transform:scale(2)}}
 
 @media (max-width:860px){
   .top nav{margin-left:0;width:100%;order:3}.top .btn{margin-left:auto}
-  .hero .in,[data-v=c] .hero .in{grid-template-columns:minmax(0,1fr);grid-template-areas:"txt" "scope" "read";padding-bottom:48px}
+  .hero .in{grid-template-columns:minmax(0,1fr);grid-template-areas:"txt" "scope" "read";padding-bottom:48px}
   .hero-txt{grid-template-columns:minmax(0,1fr)}.hero .cta{grid-column:1}.hero .lead{margin-top:14px}
   .hero-map{padding:8px}.scope::after{display:none}
   .scale .cells,.scale .ticks{width:180px}.scale .ticks{margin-left:-194px}
-  [data-v=c] .hero-txt{grid-area:txt;padding-top:8px}[data-v=c] .scope{padding-top:40px}
-  [data-v=c] .readout{grid-template-columns:minmax(0,1fr)}
   .kpi div{border-right:0;border-bottom:1px solid var(--line-2)}
 }
