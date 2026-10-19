@@ -104,7 +104,8 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
         w, h, pad = 640, 180, 24
         mx = max(v for _, v in series) or 1
         bw = (w - pad) / len(series)
-        bars = []
+        bars = [f'<line class="gl" x1="0" x2="{w}" y1="{h - pad - (h - 2 * pad) * q:.1f}" y2="{h - pad - (h - 2 * pad) * q:.1f}"/>'
+                for q in (0, .5, 1)]  # шкала прибора: ноль, половина, максимум
         for i, (d, v) in enumerate(series):
             bh = (h - 2 * pad) * v / mx
             x = pad / 2 + i * bw
@@ -138,7 +139,7 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
         map_href = f"/karta/?mode=niche&need={quote(n.need_id)}&m=msp_active"
         why = (f'<p class="lead">Самый быстрый рост числа субъектов МСП по России за 12 месяцев среди всех ниш '
                f'таксономии ({len(self.f.needs)}).</p>' if rubric else "")
-        body = f"""<h1>{E(h1)}</h1>{why}
+        body = f"""<p class="eyebrow">Факты · ниша · снимок {self.f.data_date:%d.%m.%Y}</p><h1>{E(h1)}</h1>{why}
 <div class="kpi"><div><b>{num(n.active)}</b>активных субъектов МСП по РФ</div>
 <div><b>{pct(n.growth)}</b>за 12 месяцев</div>
 <div><b>{share(n.survival)}</b>новых работают через 12 месяцев{f' (когорта {date_ru(n.survival_cohort)})' if n.survival_cohort and n.survival is not None else ''}</div></div>
@@ -158,7 +159,7 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
         top = nn.get(r.top_needs[0].key, "") if r.top_needs else ""
         desc = (f"{r.name}: {num(r.active)} активных субъектов МСП на {date_ru(self.f.data_date)}, за 12 месяцев "
                 f"{pct(r.growth)}. Самая массовая ниша — {top}. Данные реестра МСП ФНС.")
-        body = f"""<h1>{E(h1)}</h1>
+        body = f"""<p class="eyebrow">Факты · регион · снимок {self.f.data_date:%d.%m.%Y}</p><h1>{E(h1)}</h1>
 <div class="kpi"><div><b>{num(r.active)}</b>активных субъектов МСП</div><div><b>{pct(r.growth)}</b>за 12 месяцев</div>
 <div><b>{share(r.survival)}</b>новых работают через 12 месяцев</div></div>
 <a class="cta" href="/karta/?mode=region&region={quote(r.region_id)}&m=msp_active">Открыть регион на карте</a>
@@ -169,30 +170,43 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
 <p class="mut"><a href="/metodologiya/">Методология</a>.</p>"""
         self.page(path or f"/fakty/region/{r.region_id}/", f"{h1} — Нишемер", desc, body)
 
-    def hero_map(self) -> str:
+    def signals(self, n: int = 5) -> list[RegionFacts]:
+        """Импульсы прибора: регионы с самым быстрым ростом числа субъектов МСП за 12 месяцев."""
+        grown = [r for r in self.f.regions.values() if r.growth is not None and r.growth > 0]
+        return sorted(grown, key=lambda r: (-(r.growth or 0), r.region_id))[:n]
+
+    def hero_map(self, sig: list[RegionFacts]) -> str:
         if not self.geojson:
             return ""
         info = {k: (f"{r.name}: {pct(r.growth)} за 12 месяцев, {num(r.active)} субъектов", r.growth,
                     f"/fakty/region/{quote(k)}/") for k, r in self.f.regions.items()}
         cap = "Изменение числа субъектов МСП за 12 месяцев"
-        return (f'<figure class="hero-map">{heromap.svg(self.geojson, info, cap + " по субъектам РФ")}'
-                f'<figcaption><b>{cap}</b> · регион — ссылка на его факты{heromap.legend()}</figcaption></figure>')
+        pulses = [(r.region_id, f"{i:02d}") for i, r in enumerate(sig, 1)]  # номер — строка в «Сигналах»
+        scanned = sum(r.growth is not None for r in self.f.regions.values())
+        return (f'<div class="scope"><div class="scope-hd"><span>Скан · {cap.lower()}</span>'
+                f'<span>{scanned}/{len(self.f.regions)} · {self.f.data_date:%d.%m.%Y}</span></div>'
+                f'<figure class="hero-map">{heromap.svg(self.geojson, info, cap + " по субъектам РФ", pulses)}</figure>'
+                f'<div class="scope-ft">{heromap.legend()}<span class="mut">регион — ссылка на его факты</span></div></div>')
 
     def hero(self) -> str:
         f = self.f
         total = sum(x.active for x in f.regions.values())
-        big = f'{total / 1e6:.1f}'.replace(".", ",") + "<u> млн</u>" if total >= 1e6 else num(total)
-        return f"""<section class="hero"><div class="in">{self.hero_map()}<div class="hero-txt">
-<p class="eyebrow">Реестр МСП ФНС · снимок на {date_ru(f.data_date)}</p>
-<h1>Нишемер</h1>
-<p class="sub">где в России <b>какой малый бизнес</b></p>
-<p class="lead">{len(f.needs)} {plural(len(f.needs), ("ниша", "ниши", "ниш"))} малого бизнеса по {len(f.regions)} субъектам РФ с 2016 года. Только измеренные факты: сколько
-субъектов, как меняется их число, сколько новых работает через год.</p>
-<a class="cta" href="/karta/">Открыть карту →</a></div></div></section>
-<section class="band"><div class="in"><p class="eyebrow">Реестр в цифрах</p><div class="kpi">
-<div><b>{big}</b>активных субъектов МСП в реестре ({num(total)})</div>
-<div><b>{len(f.needs)}</b>{plural(len(f.needs), ("ниша", "ниши", "ниш"))} малого бизнеса — по основному ОКВЭД</div>
-<div><b>{len(f.regions)}</b>{plural(len(f.regions), ("субъект", "субъекта", "субъектов"))} РФ с данными, история с 2016 года</div></div></div></section>"""
+        big = f'{total / 1e6:.1f}'.replace(".", ",") + " млн" if total >= 1e6 else num(total)
+        sig = self.signals()
+        rows = "".join(f'<li><a href="/fakty/region/{quote(r.region_id)}/">{E(r.name)}</a><b>{pct(r.growth)}</b></li>'
+                       for r in sig)
+        nn = len(f.needs)
+        return f"""<section class="hero"><div class="in"><div class="hero-txt">
+<p class="eyebrow">Нишемер · реестр МСП ФНС</p>
+<h1>Где в России загорается малый бизнес</h1>
+<p class="lead">{nn} {plural(nn, ("ниша", "ниши", "ниш"))} по {len(f.regions)} субъектам РФ с 2016 года. Только измеренные факты:
+сколько субъектов, как меняется их число, сколько новых работает через год.</p>
+<a class="cta" href="/karta/">Открыть карту →</a></div>
+{self.hero_map(sig)}
+<aside class="readout"><p class="eyebrow">Сигналы · рост за 12 мес.</p><ol>{rows}</ol>
+<dl><div><dt>Субъектов МСП</dt><dd>{big}</dd></div><div><dt>Ниш</dt><dd>{nn}</dd></div>
+<div><dt>Регионов</dt><dd>{len(f.regions)}</dd></div><div><dt>Снимок</dt><dd>{f.data_date:%d.%m.%Y}</dd></div></dl></aside>
+</div></section>"""
 
     def index(self, nom: str | None, row: str | None) -> None:
         n = self.f.needs.get(nom or "")
