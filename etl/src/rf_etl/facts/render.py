@@ -16,6 +16,7 @@ from urllib.parse import quote
 
 import markdown
 
+from rf_etl.facts import heromap
 from rf_etl.facts.data import (MIN_BASE, MIN_COHORT, Facts, NeedFacts, Ranked, RegionFacts, load, niche_of_month,
                                region_of_week)
 
@@ -36,6 +37,13 @@ def pct(g: float | None) -> str:
     return (f"{p:+.1f}".replace(".", ",").replace("-", "−")) + " %"
 
 
+def plural(n: int, forms: tuple[str, str, str]) -> str:
+    """plural(51, ("ниша", "ниши", "ниш")) → «ниша»."""
+    if n % 10 == 1 and n % 100 != 11:
+        return forms[0]
+    return forms[1] if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else forms[2]
+
+
 def share(s: float | None) -> str:
     return "нет данных" if s is None else f"{s * 100:.0f} %"
 
@@ -44,24 +52,16 @@ def date_ru(d: dt.date) -> str:
     return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
 
 
-CSS = """:root{--bg:#f6f5f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#dcdad3;--acc:#2f6f5e}
-*{box-sizing:border-box}body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
-a{color:var(--acc)}.beta{background:var(--fg);color:var(--bg);padding:6px 16px;font-size:14px}
-header,main,footer{max-width:860px;margin:0 auto;padding:0 16px}header{display:flex;gap:16px;align-items:center;padding-top:16px;flex-wrap:wrap}
-header .logo{font-weight:700;color:var(--fg);text-decoration:none;font-size:18px}header nav{display:flex;gap:14px;flex-wrap:wrap}
-h1{font-size:30px;line-height:1.2;margin:24px 0 8px}h2{font-size:20px;margin:32px 0 8px}.lead{font-size:18px}
-.mut{color:var(--mut)}.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
-.kpi div{border:1px solid var(--line);border-radius:8px;padding:12px}.kpi b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
-td.n,th.n{text-align:right}.cta{display:inline-block;margin:12px 0;padding:10px 16px;border-radius:8px;background:var(--fg);color:var(--bg);text-decoration:none}
-.cols{columns:2 260px;padding-left:18px}svg{max-width:100%;height:auto}footer{margin-top:48px;padding-bottom:32px;font-size:14px;color:var(--mut);border-top:1px solid var(--line)}
-.eco{display:flex;gap:6px 16px;flex-wrap:wrap;margin:12px 0}.eco a,.eco span{color:var(--mut)}.eco .cur{color:var(--fg)}
-.md table{margin:12px 0}.md code{background:#ebe9e3;padding:0 4px;border-radius:3px}"""
+ASSETS = Path(__file__).parent / "assets"
+CSS = (ASSETS / "facts.css").read_text("utf-8")  # дизайн-направление T2.4, docs/04-ux.md
+FONTS = ("fira-cond-800-cyrillic.woff2", "fira-cond-800-latin.woff2", "OFL-FiraSans.txt")
 
 
 class Site:
-    def __init__(self, facts: Facts, site_url: str, eco: dict, methodology_md: str | None, today: dt.date) -> None:
+    def __init__(self, facts: Facts, site_url: str, eco: dict, methodology_md: str | None, today: dt.date,
+                 geojson: Path | None = None) -> None:
         self.f = facts
+        self.geojson = geojson
         self.url = site_url.rstrip("/")
         self.eco = eco
         self.md = methodology_md
@@ -72,7 +72,8 @@ class Site:
         return self.url + path
 
     # --- каркас ---------------------------------------------------------------------------------------------
-    def page(self, path: str, title: str, desc: str, body: str) -> None:
+    def page(self, path: str, title: str, desc: str, body: str, pre: str = "") -> None:
+        """pre — полноширинные секции до основного текста (hero и полоса цифр главной)."""
         eco = "".join(
             f'<span class="cur">{E(p["label"])}</span>' if p.get("current") or not p.get("url")
             else f'<a href="{E(p["url"])}">{E(p["label"])}</a>'
@@ -85,13 +86,14 @@ class Site:
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
 <meta property="og:url" content="{E(self.link(path))}"><meta property="og:type" content="article"><meta property="og:locale" content="ru_RU">
 </head><body>
-<div class="beta">Бета: только измеренные данные реестра МСП ФНС, прогнозов пока нет.</div>
-<header><a class="logo" href="/">Нишемер</a><nav><a href="/karta/">Карта</a><a href="/fakty/nisha-mesyaca/">Ниша месяца</a>
-<a href="/fakty/region-nedeli/">Регион недели</a><a href="/metodologiya/">Методология</a></nav></header>
-<main>{body}</main>
-<footer><div class="eco">{eco}</div>
+<div class="beta"><b>Бета</b> · только измеренные данные реестра МСП ФНС, прогнозов пока нет</div>
+<header class="top"><div class="in"><a class="logo" href="/"><i></i>Нишемер</a><nav><a href="/fakty/nisha-mesyaca/">Ниша месяца</a>
+<a href="/fakty/region-nedeli/">Регион недели</a><a href="/metodologiya/">Методология</a></nav>
+<a class="btn" href="/karta/">Карта</a></div></header>
+{pre}<main>{body}</main>
+<footer><div class="in"><div class="eco">{eco}</div>
 <div><a href="{E(author["url"])}">{E(author["label"])}</a> · Данные: Единый реестр субъектов МСП (ФНС России), снимок на {date_ru(self.f.data_date)};
-snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_version)}. Границы субъектов © участники OpenStreetMap.</div></footer>
+snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_version)}. Границы субъектов © участники OpenStreetMap.</div></div></footer>
 </body></html>
 """
 
@@ -106,9 +108,9 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
         for i, (d, v) in enumerate(series):
             bh = (h - 2 * pad) * v / mx
             x = pad / 2 + i * bw
-            bars.append(f'<rect x="{x + 2:.1f}" y="{h - pad - bh:.1f}" width="{bw - 4:.1f}" height="{bh:.1f}" fill="#2f6f5e">'
+            bars.append(f'<rect class="bar" x="{x + 2:.1f}" y="{h - pad - bh:.1f}" width="{bw - 4:.1f}" height="{bh:.1f}">'
                         f'<title>{d.year}: {num(v)}</title></rect>'
-                        f'<text x="{x + bw / 2:.1f}" y="{h - 6}" font-size="11" text-anchor="middle" fill="#6b6b66">{d.year}</text>')
+                        f'<text class="ax" x="{x + bw / 2:.1f}" y="{h - 6}" font-size="11" text-anchor="middle">{d.year}</text>')
         return (f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{E(label)}">{"".join(bars)}</svg>'
                 f'<table><thead><tr><th>Снимок реестра</th><th class="n">Активных субъектов</th></tr></thead><tbody>'
                 + "".join(f'<tr><td>{date_ru(d)}</td><td class="n">{num(v)}</td></tr>' for d, v in series)
@@ -167,6 +169,31 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
 <p class="mut"><a href="/metodologiya/">Методология</a>.</p>"""
         self.page(path or f"/fakty/region/{r.region_id}/", f"{h1} — Нишемер", desc, body)
 
+    def hero_map(self) -> str:
+        if not self.geojson:
+            return ""
+        info = {k: (f"{r.name}: {pct(r.growth)} за 12 месяцев, {num(r.active)} субъектов", r.growth,
+                    f"/fakty/region/{quote(k)}/") for k, r in self.f.regions.items()}
+        cap = "Изменение числа субъектов МСП за 12 месяцев"
+        return (f'<figure class="hero-map">{heromap.svg(self.geojson, info, cap + " по субъектам РФ")}'
+                f'<figcaption><b>{cap}</b> · регион — ссылка на его факты{heromap.legend()}</figcaption></figure>')
+
+    def hero(self) -> str:
+        f = self.f
+        total = sum(x.active for x in f.regions.values())
+        big = f'{total / 1e6:.1f}'.replace(".", ",") + "<u> млн</u>" if total >= 1e6 else num(total)
+        return f"""<section class="hero"><div class="in">{self.hero_map()}<div class="hero-txt">
+<p class="eyebrow">Реестр МСП ФНС · снимок на {date_ru(f.data_date)}</p>
+<h1>Нишемер</h1>
+<p class="sub">где в России <b>какой малый бизнес</b></p>
+<p class="lead">{len(f.needs)} {plural(len(f.needs), ("ниша", "ниши", "ниш"))} малого бизнеса по {len(f.regions)} субъектам РФ с 2016 года. Только измеренные факты: сколько
+субъектов, как меняется их число, сколько новых работает через год.</p>
+<a class="cta" href="/karta/">Открыть карту →</a></div></div></section>
+<section class="band"><div class="in"><p class="eyebrow">Реестр в цифрах</p><div class="kpi">
+<div><b>{big}</b>активных субъектов МСП в реестре ({num(total)})</div>
+<div><b>{len(f.needs)}</b>{plural(len(f.needs), ("ниша", "ниши", "ниш"))} малого бизнеса — по основному ОКВЭД</div>
+<div><b>{len(f.regions)}</b>{plural(len(f.regions), ("субъект", "субъекта", "субъектов"))} РФ с данными, история с 2016 года</div></div></div></section>"""
+
     def index(self, nom: str | None, row: str | None) -> None:
         n = self.f.needs.get(nom or "")
         r = self.f.regions.get(row or "")
@@ -174,19 +201,12 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
                         for k, v in sorted(self.f.needs.items(), key=lambda kv: kv[1].name))
         regs = "".join(f'<li><a href="/fakty/region/{quote(k)}/">{E(self.f.regions[k].name)}</a></li>'
                        for k in sorted(self.f.regions, key=lambda k: self.f.regions[k].name))
-        total = sum(x.active for x in self.f.regions.values())
-        body = f"""<h1>Нишемер: где в России какой малый бизнес</h1>
-<p class="lead">Карта {len(self.f.needs)} ниш малого бизнеса по {len(self.f.regions)} субъектам РФ с 2016 года — по открытому
-реестру МСП ФНС. Только измеренные факты: сколько субъектов, как меняется их число, сколько новых работает через год.</p>
-<div class="kpi"><div><b>{num(total)}</b>активных субъектов МСП в реестре на {date_ru(self.f.data_date)}</div>
-<div><b>{len(self.f.needs)}</b>ниш</div><div><b>{len(self.f.regions)}</b>субъектов РФ</div></div>
-<a class="cta" href="/karta/">Открыть карту</a>
-{f'<h2>Ниша месяца: <a href="/fakty/nisha-mesyaca/">{E(n.name)}</a></h2><p>{pct(n.growth)} за 12 месяцев по России, {num(n.active)} субъектов.</p>' if n else ''}
+        body = f"""{f'<h2>Ниша месяца: <a href="/fakty/nisha-mesyaca/">{E(n.name)}</a></h2><p>{pct(n.growth)} за 12 месяцев по России, {num(n.active)} субъектов.</p>' if n else ''}
 {f'<h2>Регион недели: <a href="/fakty/region-nedeli/">{E(r.name)}</a></h2><p>{num(r.active)} субъектов МСП, {pct(r.growth)} за 12 месяцев.</p>' if r else ''}
 <h2>Все ниши</h2><ul class="cols">{needs}</ul><h2>Все регионы</h2><ul class="cols">{regs}</ul>"""
         self.page("/", "Нишемер — малый бизнес по регионам России: факты реестра МСП",
                   f"Сколько малого бизнеса каждой ниши в каждом регионе России и как это меняется с 2016 года. "
-                  f"{len(self.f.needs)} ниш, {len(self.f.regions)} регионов, реестр МСП ФНС.", body)
+                  f"{len(self.f.needs)} ниш, {len(self.f.regions)} регионов, реестр МСП ФНС.", body, self.hero())
 
     def methodology(self) -> None:
         if not self.md:
@@ -218,6 +238,9 @@ snapshot {E(self.f.snapshot)}, методология {E(self.f.methodology_vers
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(doc, "utf-8")
         (out / "facts.css").write_text(CSS, "utf-8")
+        (out / "fonts").mkdir()
+        for name in FONTS:  # Fira Sans Condensed 800 (SIL OFL 1.1) — шрифт экосистемы
+            shutil.copyfile(ASSETS / name, out / "fonts" / name)
         lastmod = self.f.data_date.isoformat()
         urls = "".join(f"<url><loc>{E(self.link(p))}</loc><lastmod>{lastmod}</lastmod></url>" for p in sorted(self.pages))
         (out / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -236,6 +259,8 @@ def build(marts_dir: str | Path, config_dir: str | Path, out_dir: str | Path, si
     cfg = Path(config_dir)
     eco = json.loads((cfg / "ecosystem.json").read_text("utf-8"))
     md = Path(methodology).read_text("utf-8") if methodology else None
-    site = Site(load(marts_dir, cfg), site_url, eco, md, today or dt.datetime.now(dt.UTC).date())
+    geo = cfg / "geo" / "regions.geojson"
+    site = Site(load(marts_dir, cfg), site_url, eco, md, today or dt.datetime.now(dt.UTC).date(),
+                geo if geo.is_file() else None)
     site.build()
     return site.write(out_dir)
