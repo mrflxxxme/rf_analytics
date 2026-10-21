@@ -38,7 +38,7 @@ export function MapView({ geo, fill, fillKey, selected, onHover, onClick }: Prop
       style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "rgba(0,0,0,0)" } }] }, // сетка прибора — фон .mapwrap
       bounds: BOUNDS,
       fitBoundsOptions: { padding: 12 },
-      renderWorldCopies: false,
+      renderWorldCopies: true, // при false камера не выходит за 180° и обрезает склеенную Чукотку (87, до 191° в.д.)
       dragRotate: false,
       pitchWithRotate: false,
       attributionControl: false,

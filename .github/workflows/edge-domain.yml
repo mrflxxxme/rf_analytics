@@ -1,0 +1,50 @@
+name: edge-domain
+
+# Шаг «M1-домен» (D37): блок своего домена в edge-caddy на 194.87.187.207 через deploy/edge-domain.sh.
+# Только ручной запуск. dry-run — чтение и validate копии конфига; apply — боевая правка,
+# запускается после «да» владельца (Э-56) и когда A-записи домена и www указывают на 194.87.187.207.
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: Домен (без www)
+        default: nishemer.ru
+        required: true
+      mode:
+        description: dry-run | apply
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-caddy
+  cancel-in-progress: false
+
+jobs:
+  edge:
+    runs-on: ubuntu-latest
+    env:
+      SERVER: root@194.87.187.207
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.RF_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.RF_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host 194.87.187.207\n  IdentityFile ~/.ssh/id_deploy\n  BatchMode yes\n  ConnectTimeout 30\n' > ~/.ssh/config
+      - name: edge-caddy (${{ inputs.mode }} ${{ inputs.host }})
+        env:
+          HOST: ${{ inputs.host }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -o pipefail
+          [[ "$HOST" =~ ^[a-z0-9][a-z0-9.-]+$ ]] || { echo "недопустимый host"; exit 2; }
+          ssh "$SERVER" "HOST='$HOST' MODE='$MODE' bash -s" < deploy/edge-domain.sh | tee out.txt
+          { echo "### edge-domain $MODE $HOST"; echo '```'; cat out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
